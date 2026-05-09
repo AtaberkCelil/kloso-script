@@ -20,10 +20,14 @@ local Lighting = cloneref(game:GetService("Lighting"))
 local Settings = {
     MurdererESP = true, SheriffESP = true,
     PlayerESP = false, CoinESP = false,
-    AutoCoin = false, FlingMurderer = false,
+    AutoCoin = false, FlingMurderer = false, FlingAll = false,
     GrabGun = false, XRay = false, MurdAlert = false, Fullbright = false,
     Speed = false, SpeedVal = 25,
-    Noclip = false, InfJump = false, Fly = false, FlySpeed = 50
+    Noclip = false, InfJump = false, Fly = false, FlySpeed = 50,
+    Waypoints = {
+        Lobby = {0, 50, 0}, -- Placeholder, will add real lobby pos
+        Map = {0, 100, 0}
+    }
 }
 
 local ConfigName = "KlosoHub_MM2.json"
@@ -139,55 +143,36 @@ local function UpdateCoinESP()
 end
 task.spawn(function() while task.wait(5) do if Settings.CoinESP then UpdateCoinESP() end end end)
 
--- Auto Coin
-local touchedCoins = {}
+-- Improved Auto Coin
+local collecting = false
 task.spawn(function()
     while task.wait(0.1) do
-        if Settings.AutoCoin and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        if Settings.AutoCoin and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") and not collecting then
+            collecting = true
             local hrp = LP.Character.HumanoidRootPart
-            local coinsToCollect = {}
+            local coins = {}
             
-            local normal = WS:FindFirstChild("Normal")
-            if normal and normal:FindFirstChild("CoinContainer") then
-                for _, c in pairs(normal.CoinContainer:GetDescendants()) do
-                    if (c.Name == "Coin" or c.Name == "Snowflake" or c.Name == "Gem") and c:IsA("BasePart") and c.Transparency < 1 then
-                        table.insert(coinsToCollect, c)
+            -- Search for coins
+            for _,v in pairs(WS:GetDescendants()) do
+                if (v.Name == "Coin" or v.Name == "Snowflake" or v.Name == "Gem") and v:IsA("BasePart") and v.Transparency < 1 then
+                    table.insert(coins, v)
+                end
+            end
+            
+            for _, c in pairs(coins) do
+                if not Settings.AutoCoin then break end
+                if c and c.Parent and c.Transparency < 1 then
+                    local targetPos = c.Position
+                    -- Fly to coin logic (smooth CFrame)
+                    local dist = (hrp.Position - targetPos).Magnitude
+                    if dist > 5 then
+                        hrp.CFrame = CFrame.new(targetPos)
                     end
+                    if firetouchinterest then firetouchinterest(hrp, c, 0) firetouchinterest(hrp, c, 1) end
+                    task.wait(0.1)
                 end
             end
-            
-            -- Fallback if CoinContainer is empty or missing
-            if #coinsToCollect == 0 then
-                for _, obj in pairs(WS:GetChildren()) do
-                    if obj.Name == "Coin_Server" or obj.Name:lower():find("coin") then
-                        if obj:IsA("BasePart") then table.insert(coinsToCollect, obj) end
-                        for _, c in pairs(obj:GetDescendants()) do
-                            if (c.Name == "Coin" or c.Name == "Snowflake" or c.Name == "Gem") and c:IsA("BasePart") and c.Transparency < 1 then
-                                table.insert(coinsToCollect, c)
-                            end
-                        end
-                    end
-                end
-            end
-            
-            for _, c in pairs(coinsToCollect) do
-                if Settings.AutoCoin and c and c.Parent and c.Transparency < 1 and not touchedCoins[c] then
-                    hrp.CFrame = c.CFrame
-                    if firetouchinterest then
-                        firetouchinterest(hrp, c, 0)
-                        firetouchinterest(hrp, c, 1)
-                    end
-                    touchedCoins[c] = true
-                    task.wait(0.2)
-                end
-            end
-            
-            -- Memory Cleanup
-            if math.random(1, 20) == 1 then
-                for k, _ in pairs(touchedCoins) do
-                    if not k or not k.Parent then touchedCoins[k] = nil end
-                end
-            end
+            collecting = false
         end
     end
 end)
@@ -235,6 +220,35 @@ task.spawn(function()
                         lastAlertTick = tick()
                     end
                 end
+            end
+        end
+    end
+end)
+
+-- Fling Logic (MM2 Specific)
+local function FlingPlayer(target)
+    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = LP.Character.HumanoidRootPart
+    local tHRP = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+    if tHRP then
+        local oldPos = hrp.CFrame
+        for _, v in pairs(LP.Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = false end end
+        hrp.RotVelocity = Vector3.new(0, 10000, 0)
+        hrp.CFrame = tHRP.CFrame * CFrame.new(0, 0, 1)
+        task.wait(0.1)
+        hrp.Velocity = Vector3.new(0, 10000, 0)
+    end
+end
+
+task.spawn(function()
+    while task.wait() do
+        if Settings.FlingAll then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LP and p.Character then FlingPlayer(p) end
+            end
+        elseif Settings.FlingMurderer then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LP and GetRole(p) == "Murderer" then FlingPlayer(p) end
             end
         end
     end
@@ -371,14 +385,45 @@ local function Slider(p,name,min,max,def,cb)
 end
 
 local FarmPage=CreateTab("Auto Farm")
+local FlingPage=CreateTab("Fling")
+local WorldPage=CreateTab("World")
 local RolePage=CreateTab("Roles")
 local VisPage=CreateTab("Visuals")
 local MovePage=CreateTab("Movement")
 
 Section(FarmPage,"Automation")
-Toggle(FarmPage,"Auto Collect Coins",false,function(v) Settings.AutoCoin=v end)
-Toggle(FarmPage,"Fling Murderer (Auto Kill)",false,function(v) Settings.FlingMurderer=v end)
+Toggle(FarmPage,"Auto Collect Coins (Fly)",false,function(v) Settings.AutoCoin=v end)
 Toggle(FarmPage,"Auto Grab Gun",false,function(v) Settings.GrabGun=v end)
+
+Section(FlingPage,"Kill Players")
+Toggle(FlingPage,"Fling Murderer",false,function(v) Settings.FlingMurderer=v end)
+Toggle(FlingPage,"Fling All Players",false,function(v) Settings.FlingAll = v end)
+Button(FlingPage,"Fling Nearest",function()
+    local best,dist = nil,math.huge
+    for _,p in pairs(Players:GetPlayers()) do
+        if p~=LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local d=(LP.Character.HumanoidRootPart.Position-p.Character.HumanoidRootPart.Position).Magnitude
+            if d<dist then best=p dist=d end
+        end
+    end
+    if best then FlingPlayer(best) end
+end)
+
+Section(WorldPage,"Teleport Menu")
+Button(WorldPage,"Teleport to Lobby",function()
+    if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        LP.Character.HumanoidRootPart.CFrame = CFrame.new(-108, 140, 10) -- Lobby coords
+    end
+end)
+Button(WorldPage,"Teleport to Map",function()
+    local map = WS:FindFirstChild("Normal")
+    if map then
+        LP.Character.HumanoidRootPart.CFrame = map:GetModelCFrame() + Vector3.new(0, 5, 0)
+    end
+end)
+Button(WorldPage,"Teleport to Voting Area",function()
+    LP.Character.HumanoidRootPart.CFrame = CFrame.new(-108, 140, 60)
+end)
 
 Section(RolePage,"Role Detection ESP")
 Toggle(RolePage,"Murderer ESP (Red)",true,function(v) Settings.MurdererESP=v end)
