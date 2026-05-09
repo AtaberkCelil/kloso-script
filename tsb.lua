@@ -10,6 +10,7 @@ local Lighting = cloneref(game:GetService("Lighting"))
 local StarterGui = cloneref(game:GetService("StarterGui"))
 local WS = cloneref(game:GetService("Workspace"))
 local CoreGui = cloneref(game:GetService("CoreGui"))
+local HttpService = cloneref(game:GetService("HttpService"))
 
 local LP = Players.LocalPlayer
 local Mouse = LP:GetMouse()
@@ -19,7 +20,7 @@ print("[KLOSO TSB] Services Loaded.")
 
 -- [[ THEME & SETTINGS ]]
 local Theme = {
-	Accent = Color3.fromRGB(255, 200, 50), -- Gold accent for TSB
+	Accent = Color3.fromRGB(255, 200, 50),
 	Bg = Color3.fromRGB(15, 15, 12),
 	Card = Color3.fromRGB(25, 25, 20),
 	Border = Color3.fromRGB(60, 60, 30),
@@ -30,12 +31,13 @@ local Theme = {
 local Settings = {
 	Combat = {
         KillAura = false,
-        AutoBlock = false,
-        AutoDash = false,
+        AutoFarm = false,
         AuraRange = 10,
 		Hitbox = false,
 		HitboxSize = 10,
-		TeamCheck = false
+		TeamCheck = false,
+        NinjaMacro = false,
+        NinjaKey = Enum.KeyCode.E
 	},
 	Visuals = {
 		ESP = false,
@@ -58,6 +60,49 @@ local Settings = {
 
 local Connections = {}
 
+-- [[ CONFIG SYSTEM ]]
+local ConfigName = "KlosoHub_TSB.json"
+local function SaveConfig()
+    pcall(function()
+        if not isfolder("KlosoHub") then makefolder("KlosoHub") end
+        local toSave = {
+            Combat = { KillAura = Settings.Combat.KillAura, AutoFarm = Settings.Combat.AutoFarm, Hitbox = Settings.Combat.Hitbox, HitboxSize = Settings.Combat.HitboxSize },
+            Visuals = { ESP = Settings.Visuals.ESP, Boxes = Settings.Visuals.Boxes, Names = Settings.Visuals.Names, Health = Settings.Visuals.Health },
+            Movement = { Speed = Settings.Movement.Speed, SpeedVal = Settings.Movement.SpeedVal, Noclip = Settings.Movement.Noclip, InfJump = Settings.Movement.InfJump, Bhop = Settings.Movement.Bhop }
+        }
+        writefile("KlosoHub/" .. ConfigName, HttpService:JSONEncode(toSave))
+        StarterGui:SetCore("SendNotification", {Title="KLOSO HUB", Text="Config Saved!", Duration=3})
+    end)
+end
+
+local function LoadConfig()
+    pcall(function()
+        if isfile("KlosoHub/" .. ConfigName) then
+            local decoded = HttpService:JSONDecode(readfile("KlosoHub/" .. ConfigName))
+            if decoded.Combat then
+                Settings.Combat.KillAura = decoded.Combat.KillAura or false
+                Settings.Combat.AutoFarm = decoded.Combat.AutoFarm or false
+                Settings.Combat.Hitbox = decoded.Combat.Hitbox or false
+                Settings.Combat.HitboxSize = decoded.Combat.HitboxSize or 10
+            end
+            if decoded.Visuals then
+                Settings.Visuals.ESP = decoded.Visuals.ESP or false
+                Settings.Visuals.Boxes = decoded.Visuals.Boxes or false
+                Settings.Visuals.Names = decoded.Visuals.Names or false
+                Settings.Visuals.Health = decoded.Visuals.Health or false
+            end
+            if decoded.Movement then
+                Settings.Movement.Speed = decoded.Movement.Speed or false
+                Settings.Movement.SpeedVal = decoded.Movement.SpeedVal or 25
+                Settings.Movement.Noclip = decoded.Movement.Noclip or false
+                Settings.Movement.InfJump = decoded.Movement.InfJump or false
+                Settings.Movement.Bhop = decoded.Movement.Bhop or false
+            end
+            StarterGui:SetCore("SendNotification", {Title="KLOSO HUB", Text="Config Loaded! Reopen UI to see changes.", Duration=3})
+        end
+    end)
+end
+
 -- [[ UTILITIES ]]
 local function Create(cl,p) 
 	local i = Instance.new(cl) 
@@ -67,11 +112,7 @@ local function Create(cl,p)
 end
 
 local function Tw(o,g) TweenService:Create(o, TweenInfo.new(0.25, Enum.EasingStyle.Quart), g):Play() end
-
-local function IsTeammate(p)
-	if p.Team ~= nil and LP.Team ~= nil and p.Team == LP.Team then return true end
-	return false
-end
+local function IsTeammate(p) return (p.Team ~= nil and LP.Team ~= nil and p.Team == LP.Team) end
 
 -- [[ TSB COMBAT LOGIC ]]
 local function GetClosestToPlayer(range)
@@ -97,12 +138,24 @@ end
 -- TSB Combat Loop
 local lastPunch = 0
 Connections.CombatLoop = RS.Stepped:Connect(function()
-    -- Kill Aura (Auto Punch)
+    -- Kill Aura
     if Settings.Combat.KillAura then
         local target = GetClosestToPlayer(Settings.Combat.AuraRange)
         if target then
             if tick() - lastPunch > 0.2 then
-                -- Standard M1 simulator (often works by just clicking or firing virtual input)
+                if mouse1click then mouse1click() end
+                lastPunch = tick()
+            end
+        end
+    end
+
+    -- Auto Farm (Teleports behind enemies and punches)
+    if Settings.Combat.AutoFarm then
+        local target = GetClosestToPlayer(math.huge) -- Find anyone across map
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            -- Teleport behind target
+            LP.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3.5)
+            if tick() - lastPunch > 0.2 then
                 if mouse1click then mouse1click() end
                 lastPunch = tick()
             end
@@ -124,14 +177,26 @@ Connections.CombatLoop = RS.Stepped:Connect(function()
     end
 end)
 
+-- Ninja Macro
+Connections.NinjaMacro = UIS.InputBegan:Connect(function(i, g)
+    if not g and Settings.Combat.NinjaMacro and i.KeyCode == Settings.Combat.NinjaKey then
+        local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local origCFrame = hrp.CFrame
+            -- Teleport under map to execute the Ninja grab
+            hrp.CFrame = origCFrame * CFrame.new(0, -150, 0)
+            task.wait(0.35)
+            -- Return back
+            hrp.CFrame = origCFrame
+        end
+    end
+end)
+
 -- [[ VISUALS LOGIC ]]
 local ESP_Objects = {}
 local function GetESPObj(p)
     if not ESP_Objects[p] then
-        ESP_Objects[p] = {
-            Box = Drawing.new("Square"), BoxOutline = Drawing.new("Square"),
-            Name = Drawing.new("Text"), Health = Drawing.new("Line"), HealthOutline = Drawing.new("Line")
-        }
+        ESP_Objects[p] = { Box = Drawing.new("Square"), BoxOutline = Drawing.new("Square"), Name = Drawing.new("Text"), Health = Drawing.new("Line"), HealthOutline = Drawing.new("Line") }
         local o = ESP_Objects[p]
         o.Box.Thickness = 1 o.Box.Filled = false
         o.BoxOutline.Thickness = 3 o.BoxOutline.Filled = false o.BoxOutline.Color = Color3.new(0, 0, 0)
@@ -150,14 +215,12 @@ Players.PlayerRemoving:Connect(function(p)
 end)
 
 Connections.RenderLoop = RS.RenderStepped:Connect(function()
-    -- ESP Loop
     for _, p in pairs(Players:GetPlayers()) do
         if p == LP then continue end
         local char = p.Character
         if not Settings.Visuals.ESP or not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") or char.Humanoid.Health <= 0 then
             HideESP(p) continue
         end
-        if Settings.Combat.TeamCheck and IsTeammate(p) then HideESP(p) continue end
         
         local hrp = char.HumanoidRootPart
         local hum = char.Humanoid
@@ -206,12 +269,9 @@ Connections.MoveLoop = RS.Stepped:Connect(function()
     end
 end)
 
--- Speed
 task.spawn(function()
     while task.wait(0.5) do
-        if Settings.Movement.Speed and LP.Character and LP.Character:FindFirstChild("Humanoid") then
-			LP.Character.Humanoid.WalkSpeed = Settings.Movement.SpeedVal
-		end
+        if Settings.Movement.Speed and LP.Character and LP.Character:FindFirstChild("Humanoid") then LP.Character.Humanoid.WalkSpeed = Settings.Movement.SpeedVal end
     end
 end)
 
@@ -221,19 +281,15 @@ if oldGui then oldGui:Destroy() end
 
 local Gui = Create("ScreenGui", {Parent = (gethui or function() return CoreGui end)(), Name = "KlosoTSB"})
 local Main = Create("Frame", {Parent = Gui, Size = UDim2.fromOffset(500, 350), Position = UDim2.new(0.5, 0, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = Theme.Bg, BorderSizePixel = 0})
-Create("UICorner", {Parent = Main, CornerRadius = UDim.new(0, 8)})
-Create("UIStroke", {Parent = Main, Color = Theme.Border, Thickness = 1.5})
+Create("UICorner", {Parent = Main, CornerRadius = UDim.new(0, 8)}) Create("UIStroke", {Parent = Main, Color = Theme.Border, Thickness = 1.5})
 
--- Sidebar
 local Sidebar = Create("Frame", {Parent = Main, Size = UDim2.new(0, 120, 1, 0), BackgroundColor3 = Theme.Card, BorderSizePixel = 0})
 Create("UICorner", {Parent = Sidebar, CornerRadius = UDim.new(0, 8)})
 Create("Frame", {Parent = Sidebar, Size = UDim2.new(0, 10, 1, 0), Position = UDim2.new(1, -10, 0, 0), BackgroundColor3 = Theme.Card, BorderSizePixel = 0})
-
 local Title = Create("TextLabel", {Parent = Sidebar, Size = UDim2.new(1, 0, 0, 50), BackgroundTransparency = 1, Text = "KLOSO TSB", TextColor3 = Theme.Accent, TextSize = 16, Font = Enum.Font.GothamBold})
 
 local Floating = Create("TextButton", {Parent = Gui, Size = UDim2.fromOffset(40, 40), Position = UDim2.new(0, 10, 0.5, 0), BackgroundColor3 = Theme.Card, Text = "K", TextColor3 = Theme.Accent, TextSize = 20, Font = Enum.Font.GothamBold, Visible = false})
-Create("UICorner", {Parent = Floating, CornerRadius = UDim.new(1, 0)})
-Create("UIStroke", {Parent = Floating, Color = Theme.Accent, Thickness = 2})
+Create("UICorner", {Parent = Floating, CornerRadius = UDim.new(1, 0)}) Create("UIStroke", {Parent = Floating, Color = Theme.Accent, Thickness = 2})
 
 local function ToggleUI(on) Main.Visible = on Floating.Visible = not on end
 Floating.MouseButton1Click:Connect(function() ToggleUI(true) end)
@@ -256,75 +312,83 @@ CreateTopBtn("×", Color3.fromRGB(255, 80, 80), function()
 end)
 
 local TabContainer = Create("Frame", {Parent = Main, Size = UDim2.new(1, -130, 1, -20), Position = UDim2.new(0, 130, 0, 10), BackgroundTransparency = 1})
-
--- Tab Management
 local Tabs = {}
 local function CreateTab(name)
 	local btn = Create("TextButton", {Parent = Sidebar, Size = UDim2.new(1, -10, 0, 35), Position = UDim2.new(0, 5, 0, 60 + (#Tabs * 40)), BackgroundColor3 = Theme.Bg, Text = name, TextColor3 = Theme.Sub, TextSize = 12, Font = Enum.Font.GothamSemibold})
 	Create("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 6)})
 	local page = Create("ScrollingFrame", {Parent = TabContainer, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0, Visible = (#Tabs == 0), ScrollBarThickness = 0, CanvasSize = UDim2.new(0,0,3,0)})
 	Create("UIListLayout", {Parent = page, Padding = UDim.new(0, 5)})
-	
-	btn.MouseButton1Click:Connect(function()
-		for _,t in pairs(Tabs) do t.Page.Visible = false Tw(t.Btn, {TextColor3 = Theme.Sub}) end
-		page.Visible = true Tw(btn, {TextColor3 = Theme.Accent})
-	end)
-	
-	if #Tabs == 0 then btn.TextColor3 = Theme.Accent end
-	table.insert(Tabs, {Btn = btn, Page = page}) return page
+	btn.MouseButton1Click:Connect(function() for _,t in pairs(Tabs) do t.Page.Visible = false Tw(t.Btn, {TextColor3 = Theme.Sub}) end page.Visible = true Tw(btn, {TextColor3 = Theme.Accent}) end)
+	if #Tabs == 0 then btn.TextColor3 = Theme.Accent end table.insert(Tabs, {Btn = btn, Page = page}) return page
 end
 
--- Components
 local function Section(p, text) Create("TextLabel", {Parent = p, Size = UDim2.new(1, 0, 0, 25), BackgroundTransparency = 1, Text = text, TextColor3 = Theme.Accent, TextSize = 11, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left}) end
-
+local function Button(p, text, callback)
+    local row = Create("Frame", {Parent = p, Size = UDim2.new(1, -5, 0, 35), BackgroundColor3 = Theme.Card, BorderSizePixel = 0}) Create("UICorner", {Parent = row, CornerRadius = UDim.new(0, 6)})
+    local btn = Create("TextButton", {Parent = row, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = text, TextColor3 = Theme.Text, TextSize = 12, Font = Enum.Font.GothamBold})
+    btn.MouseButton1Click:Connect(callback)
+end
 local function Toggle(p, name, def, callback)
 	local on = def
 	local row = Create("Frame", {Parent = p, Size = UDim2.new(1, -5, 0, 35), BackgroundColor3 = Theme.Card, BorderSizePixel = 0}) Create("UICorner", {Parent = row, CornerRadius = UDim.new(0, 6)})
 	Create("TextLabel", {Parent = row, Size = UDim2.new(1, -50, 1, 0), Position = UDim2.new(0, 10, 0, 0), BackgroundTransparency = 1, Text = name, TextColor3 = Theme.Text, TextSize = 12, Font = Enum.Font.GothamSemibold, TextXAlignment = Enum.TextXAlignment.Left})
-	
 	local toggle = Create("Frame", {Parent = row, Size = UDim2.fromOffset(30, 16), Position = UDim2.new(1, -40, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), BackgroundColor3 = on and Theme.Accent or Theme.Border}) Create("UICorner", {Parent = toggle, CornerRadius = UDim.new(1, 0)})
 	local dot = Create("Frame", {Parent = toggle, Size = UDim2.fromOffset(12, 12), Position = on and UDim2.new(1, -14, 0.5, 0) or UDim2.new(0, 2, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), BackgroundColor3 = Theme.Text}) Create("UICorner", {Parent = dot, CornerRadius = UDim.new(1, 0)})
-	
 	local btn = Create("TextButton", {Parent = row, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = ""})
-	btn.MouseButton1Click:Connect(function()
-		on = not on Tw(toggle, {BackgroundColor3 = on and Theme.Accent or Theme.Border}) Tw(dot, {Position = on and UDim2.new(1, -14, 0.5, 0) or UDim2.new(0, 2, 0.5, 0)}) callback(on)
-	end)
+	btn.MouseButton1Click:Connect(function() on = not on Tw(toggle, {BackgroundColor3 = on and Theme.Accent or Theme.Border}) Tw(dot, {Position = on and UDim2.new(1, -14, 0.5, 0) or UDim2.new(0, 2, 0.5, 0)}) callback(on) end)
 end
-
 local function Slider(p, name, min, max, def, callback)
 	local val = def
 	local row = Create("Frame", {Parent = p, Size = UDim2.new(1, -5, 0, 45), BackgroundColor3 = Theme.Card, BorderSizePixel = 0}) Create("UICorner", {Parent = row, CornerRadius = UDim.new(0, 6)})
 	local label = Create("TextLabel", {Parent = row, Size = UDim2.new(1, -20, 0, 20), Position = UDim2.new(0, 10, 0, 2), BackgroundTransparency = 1, Text = name .. ": " .. val, TextColor3 = Theme.Text, TextSize = 11, Font = Enum.Font.GothamSemibold, TextXAlignment = Enum.TextXAlignment.Left})
 	local track = Create("Frame", {Parent = row, Size = UDim2.new(1, -20, 0, 4), Position = UDim2.new(0, 10, 0, 30), BackgroundColor3 = Theme.Border})
 	local fill = Create("Frame", {Parent = track, Size = UDim2.new(math.clamp((val-min)/(max-min), 0, 1), 0, 1, 0), BackgroundColor3 = Theme.Accent})
-	
 	local drag = false
 	local function update(i)
-		local rel = math.clamp((i.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
-		val = math.floor((min + (rel * (max-min))) * 100) / 100
+		local rel = math.clamp((i.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1) val = math.floor((min + (rel * (max-min))) * 100) / 100
 		fill.Size = UDim2.new(rel, 0, 1, 0) label.Text = name .. ": " .. val callback(val)
 	end
-	
 	local btn = Create("TextButton", {Parent = track, Size = UDim2.new(1, 0, 2, 0), Position = UDim2.new(0, 0, 0, -2), BackgroundTransparency = 1, Text = ""})
 	btn.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then drag = true update(i) end end)
 	btn.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then drag = false end end)
 	Connections["Slider_"..name] = UIS.InputChanged:Connect(function(i) if drag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then update(i) end end)
+end
+local function Keybind(p, name, def, callback)
+	local bound = def local binding = false
+	local row = Create("Frame", {Parent = p, Size = UDim2.new(1, -5, 0, 35), BackgroundColor3 = Theme.Card, BorderSizePixel = 0}) Create("UICorner", {Parent = row, CornerRadius = UDim.new(0, 6)})
+	Create("TextLabel", {Parent = row, Size = UDim2.new(1, -100, 1, 0), Position = UDim2.new(0, 10, 0, 0), BackgroundTransparency = 1, Text = name, TextColor3 = Theme.Text, TextSize = 12, Font = Enum.Font.GothamSemibold, TextXAlignment = Enum.TextXAlignment.Left})
+	local btn = Create("TextButton", {Parent = row, Size = UDim2.fromOffset(80, 24), Position = UDim2.new(1, -90, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), BackgroundColor3 = Theme.Border, Text = bound.Name, TextColor3 = Theme.Text, TextSize = 10, Font = Enum.Font.GothamBold}) Create("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 4)})
+	btn.MouseButton1Click:Connect(function()
+		binding = true btn.Text = "..." local conn
+		conn = UIS.InputBegan:Connect(function(i)
+			if i.UserInputType == Enum.UserInputType.Keyboard or i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.MouseButton2 then
+				local k = (i.UserInputType == Enum.UserInputType.Keyboard) and i.KeyCode or i.UserInputType
+				bound = (k == Enum.KeyCode.Backspace) and Enum.KeyCode.Unknown or k
+				btn.Text = bound.Name binding = false callback(bound) conn:Disconnect()
+			end
+		end)
+	end)
 end
 
 -- Tabs
 local CombatPage = CreateTab("Combat")
 local VisualPage = CreateTab("Visuals")
 local PlayerPage = CreateTab("Player")
+local ConfigPage = CreateTab("Config")
 
 -- Combat
 Section(CombatPage, "Auto Fighting")
 Toggle(CombatPage, "Kill Aura (Auto M1)", false, function(v) Settings.Combat.KillAura = v end)
+Toggle(CombatPage, "Auto Farm (Teleport M1)", false, function(v) Settings.Combat.AutoFarm = v end)
 Slider(CombatPage, "Aura Range", 5, 25, 10, function(v) Settings.Combat.AuraRange = v end)
+
+Section(CombatPage, "Ninja 3rd Macro")
+Toggle(CombatPage, "Enable Ninja Macro", false, function(v) Settings.Combat.NinjaMacro = v end)
+Keybind(CombatPage, "Macro Bind", Enum.KeyCode.E, function(v) Settings.Combat.NinjaKey = v end)
 
 Section(CombatPage, "Hitbox Manipulation")
 Toggle(CombatPage, "Hitbox Expander", false, function(v) Settings.Combat.Hitbox = v end)
 Slider(CombatPage, "Hitbox Size", 2, 50, 10, function(v) Settings.Combat.HitboxSize = v end)
-Toggle(CombatPage, "Team Check", false, function(v) Settings.Combat.TeamCheck = v end)
 
 -- Visuals
 Toggle(VisualPage, "Master ESP", false, function(v) Settings.Visuals.ESP = v end)
@@ -338,6 +402,11 @@ Slider(PlayerPage, "Speed Value", 16, 250, 25, function(v) Settings.Movement.Spe
 Toggle(PlayerPage, "Infinite Jump", false, function(v) Settings.Movement.InfJump = v end)
 Toggle(PlayerPage, "Bunny Hop (Bhop)", false, function(v) Settings.Movement.Bhop = v end)
 Toggle(PlayerPage, "Noclip", false, function(v) Settings.Movement.Noclip = v end)
+
+-- Config
+Section(ConfigPage, "Configuration System")
+Button(ConfigPage, "Save Settings to Workspace", SaveConfig)
+Button(ConfigPage, "Load Settings from Workspace", LoadConfig)
 
 -- Dragging & Toggles
 do
