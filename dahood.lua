@@ -14,37 +14,80 @@ local LP = Players.LocalPlayer
 local Camera = WS.CurrentCamera
 local Connections = {}
 
-local Theme = {Accent=Color3.fromRGB(255,100,50),Bg=Color3.fromRGB(14,10,10),Card=Color3.fromRGB(24,18,18),Border=Color3.fromRGB(60,30,30),Text=Color3.fromRGB(250,240,235),Sub=Color3.fromRGB(180,160,155)}
+local Theme = {Accent=Color3.fromRGB(0,255,100),Bg=Color3.fromRGB(10,14,10),Card=Color3.fromRGB(18,24,18),Border=Color3.fromRGB(30,60,30),Text=Color3.fromRGB(240,250,240),Sub=Color3.fromRGB(160,180,160)}
 
 local Settings = {
-    AutoFarm = false, AutoQuest = false,
-    FruitESP = false, PlayerESP = false,
-    Speed = false, SpeedVal = 100,
-    Noclip = false, InfJump = false, Fly = false, FlySpeed = 100,
-    AutoHaki = false, Fullbright = false
+    AutoStomp = false, AutoBlock = false,
+    PlayerESP = false, CashESP = false,
+    Speed = false, SpeedVal = 50,
+    Noclip = false, InfJump = false, Fly = false, FlySpeed = 100
 }
-local Connections2 = {}
 
 local function Create(cl,p) local i=Instance.new(cl) for k,v in pairs(p) do if k~="Parent" then pcall(function() i[k]=v end) end end if p.Parent then i.Parent=p.Parent end return i end
 local function Tw(o,g) TweenService:Create(o, TweenInfo.new(0.25, Enum.EasingStyle.Quart), g):Play() end
 
--- Fruit ESP via BillboardGui
-local fruitHighlights = {}
-local function UpdateFruitESP()
-    for _,v in pairs(fruitHighlights) do if v and v.Parent then v:Destroy() end end
-    fruitHighlights = {}
-    if not Settings.FruitESP then return end
-    for _,obj in pairs(WS:GetDescendants()) do
-        if obj:IsA("Tool") and obj.Parent == WS and obj:FindFirstChild("Handle") then
-            local bb = Instance.new("BillboardGui") bb.Adornee = obj.Handle bb.Size = UDim2.new(0,200,0,50) bb.StudsOffset = Vector3.new(0,3,0) bb.AlwaysOnTop = true
-            local tl = Instance.new("TextLabel",bb) tl.Size = UDim2.new(1,0,1,0) tl.BackgroundTransparency = 1 tl.Text = "🍎 "..obj.Name tl.TextColor3 = Color3.fromRGB(255,200,50) tl.TextSize = 16 tl.Font = Enum.Font.GothamBold tl.TextStrokeTransparency = 0
-            bb.Parent = obj.Handle
-            table.insert(fruitHighlights, bb)
+-- Auto Stomp
+task.spawn(function()
+    while task.wait(0.1) do
+        if Settings.AutoStomp and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            for _,p in pairs(Players:GetPlayers()) do
+                if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") then
+                    if p.Character.Humanoid.Health <= 15 then -- Roughly knocked health
+                        local dist = (LP.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                        if dist < 15 then
+                            local args = { [1] = "Stomp" }
+                            local combat = LP.Character:FindFirstChild("Combat")
+                            if combat and combat:FindFirstChild("RemoteEvent") then
+                                combat.RemoteEvent:FireServer(unpack(args))
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Auto Block
+task.spawn(function()
+    while task.wait(0.1) do
+        if Settings.AutoBlock and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            local near = false
+            for _,p in pairs(Players:GetPlayers()) do
+                if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = (LP.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                    if dist < 10 and p.Character:FindFirstChild("Combat") then
+                        near = true break
+                    end
+                end
+            end
+            local combat = LP.Character:FindFirstChild("Combat")
+            if combat and combat:FindFirstChild("RemoteEvent") then
+                if near then combat.RemoteEvent:FireServer("Block", true) else combat.RemoteEvent:FireServer("Block", false) end
+            end
+        end
+    end
+end)
+
+-- Cash ESP
+local cashHighlights = {}
+local function UpdateCashESP()
+    for _,v in pairs(cashHighlights) do if v and v.Parent then v:Destroy() end end cashHighlights = {}
+    if not Settings.CashESP then return end
+    if not WS:FindFirstChild("CashDrop") and not WS:FindFirstChild("Ignored") then return end
+    
+    local drops = WS:FindFirstChild("Ignored") and WS.Ignored:FindFirstChild("Drop") or WS
+    for _,obj in pairs(drops:GetChildren()) do
+        if obj.Name == "MoneyDrop" and obj:FindFirstChild("BillboardGui") and obj.BillboardGui:FindFirstChild("TextLabel") then
+            local amt = obj.BillboardGui.TextLabel.Text
+            local bb = Instance.new("BillboardGui") bb.Adornee = obj bb.Size = UDim2.new(0,100,0,30) bb.StudsOffset = Vector3.new(0,2,0) bb.AlwaysOnTop = true
+            local tl = Instance.new("TextLabel",bb) tl.Size = UDim2.new(1,0,1,0) tl.BackgroundTransparency = 1 tl.Text = "💵 "..amt tl.TextColor3 = Color3.fromRGB(0,255,100) tl.TextSize = 14 tl.Font = Enum.Font.GothamBold tl.TextStrokeTransparency = 0
+            bb.Parent = obj
+            table.insert(cashHighlights, bb)
         end
     end
 end
-
-task.spawn(function() while task.wait(3) do if Settings.FruitESP then UpdateFruitESP() end end end)
+task.spawn(function() while task.wait(2) do if Settings.CashESP then UpdateCashESP() end end end)
 
 -- Player ESP
 local ESP_Objects = {}
@@ -79,58 +122,14 @@ Connections.RenderLoop = RS.RenderStepped:Connect(function()
     end
 end)
 
--- Auto Farm
-local function GetNearestMob()
-    local closest, dist = nil, math.huge
-    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return nil end
-    local myPos = LP.Character.HumanoidRootPart.Position
-    if WS:FindFirstChild("Enemies") then
-        for _, v in pairs(WS.Enemies:GetChildren()) do
-            if v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
-                local d = (v.HumanoidRootPart.Position - myPos).Magnitude
-                if d < dist then
-                    dist = d
-                    closest = v
-                end
-            end
-        end
-    end
-    return closest
-end
-
-local lastFarmTick = 0
-task.spawn(function()
-    while task.wait() do
-        if Settings.AutoFarm then
-            local mob = GetNearestMob()
-            if mob and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
-                -- Teleport slightly above mob
-                LP.Character.HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
-                LP.Character.HumanoidRootPart.CFrame = mob.HumanoidRootPart.CFrame * CFrame.new(0, 7, 0)
-                -- Face mob
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, mob.HumanoidRootPart.Position)
-                -- Auto Click
-                if tick() - lastFarmTick > 0.1 then
-                    if mouse1click then mouse1click() end
-                    -- Try firing virtual user as fallback
-                    local vu = game:GetService("VirtualUser")
-                    vu:CaptureController()
-                    vu:ClickButton1(Vector2.new())
-                    lastFarmTick = tick()
-                end
-            end
-        end
-    end
-end)
-
--- Fly
-local flyBV, flyBG, flying = nil, nil, false
+-- Fly & Movement
+local flyBV,flyBG,flying=nil,nil,false
 local function StartFly()
     if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
     local hrp=LP.Character.HumanoidRootPart flying=true
     flyBV=Instance.new("BodyVelocity",hrp) flyBV.MaxForce=Vector3.new(math.huge,math.huge,math.huge) flyBV.Velocity=Vector3.new(0,0,0)
     flyBG=Instance.new("BodyGyro",hrp) flyBG.MaxTorque=Vector3.new(math.huge,math.huge,math.huge) flyBG.D=200 flyBG.P=10000
-    Connections2.FlyLoop=RS.RenderStepped:Connect(function()
+    Connections.FlyLoop=RS.RenderStepped:Connect(function()
         if not flying or not flyBV or not flyBV.Parent then return end
         local dir=Vector3.new(0,0,0) local cf=Camera.CFrame
         if UIS:IsKeyDown(Enum.KeyCode.W) then dir=dir+cf.LookVector end
@@ -142,37 +141,23 @@ local function StartFly()
         flyBV.Velocity=dir*Settings.FlySpeed flyBG.CFrame=cf
     end)
 end
-local function StopFly() flying=false if flyBV then flyBV:Destroy() flyBV=nil end if flyBG then flyBG:Destroy() flyBG=nil end if Connections2.FlyLoop then Connections2.FlyLoop:Disconnect() end end
+local function StopFly() flying=false if flyBV then flyBV:Destroy() flyBV=nil end if flyBG then flyBG:Destroy() flyBG=nil end if Connections.FlyLoop then Connections.FlyLoop:Disconnect() end end
 
--- Movement
 Connections.Jump=UIS.JumpRequest:Connect(function() if Settings.InfJump and LP.Character and LP.Character:FindFirstChild("Humanoid") then LP.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end end)
 Connections.MoveLoop=RS.Stepped:Connect(function()
     if Settings.Noclip and LP.Character then for _,v in pairs(LP.Character:GetDescendants()) do if v:IsA("BasePart") and v.CanCollide then v.CanCollide=false end end end
 end)
-task.spawn(function() while task.wait(0.5) do if LP.Character and LP.Character:FindFirstChild("Humanoid") then
-    if Settings.Speed then LP.Character.Humanoid.WalkSpeed=Settings.SpeedVal end
-end end end)
-
--- Auto Haki toggle
-task.spawn(function() while task.wait(1) do
-    if Settings.AutoHaki and LP.Character then
-        local tool = LP.Character:FindFirstChildOfClass("Tool")
-        if tool then
-            local bus = tool:FindFirstChild("Buso") or tool:FindFirstChild("BusoHaki")
-            if bus then pcall(function() game:GetService("ReplicatedStorage").Remotes.Buso:FireServer() end) end
-        end
-    end
-end end)
+task.spawn(function() while task.wait(0.5) do if Settings.Speed and LP.Character and LP.Character:FindFirstChild("Humanoid") then LP.Character.Humanoid.WalkSpeed=Settings.SpeedVal end end end)
 
 -- UI
-local oldGui=(gethui or function() return CoreGui end)():FindFirstChild("KlosoBF")
+local oldGui=(gethui or function() return CoreGui end)():FindFirstChild("KlosoDaHood")
 if oldGui then oldGui:Destroy() end
-local Gui=Create("ScreenGui",{Parent=(gethui or function() return CoreGui end)(),Name="KlosoBF"})
+local Gui=Create("ScreenGui",{Parent=(gethui or function() return CoreGui end)(),Name="KlosoDaHood"})
 local Main=Create("Frame",{Parent=Gui,Size=UDim2.fromOffset(500,380),Position=UDim2.new(0.5,0,0.5,0),AnchorPoint=Vector2.new(0.5,0.5),BackgroundColor3=Theme.Bg,BorderSizePixel=0})
 Create("UICorner",{Parent=Main,CornerRadius=UDim.new(0,8)}) Create("UIStroke",{Parent=Main,Color=Theme.Border,Thickness=1.5})
 local Sidebar=Create("Frame",{Parent=Main,Size=UDim2.new(0,120,1,0),BackgroundColor3=Theme.Card,BorderSizePixel=0})
 Create("UICorner",{Parent=Sidebar,CornerRadius=UDim.new(0,8)}) Create("Frame",{Parent=Sidebar,Size=UDim2.new(0,10,1,0),Position=UDim2.new(1,-10,0,0),BackgroundColor3=Theme.Card,BorderSizePixel=0})
-Create("TextLabel",{Parent=Sidebar,Size=UDim2.new(1,0,0,50),BackgroundTransparency=1,Text="KLOSO BF",TextColor3=Theme.Accent,TextSize=16,Font=Enum.Font.GothamBold})
+Create("TextLabel",{Parent=Sidebar,Size=UDim2.new(1,0,0,50),BackgroundTransparency=1,Text="KLOSO DA HOOD",TextColor3=Theme.Accent,TextSize=14,Font=Enum.Font.GothamBold})
 local Floating=Create("TextButton",{Parent=Gui,Size=UDim2.fromOffset(40,40),Position=UDim2.new(0,10,0.5,0),BackgroundColor3=Theme.Card,Text="K",TextColor3=Theme.Accent,TextSize=20,Font=Enum.Font.GothamBold,Visible=false})
 Create("UICorner",{Parent=Floating,CornerRadius=UDim.new(1,0)}) Create("UIStroke",{Parent=Floating,Color=Theme.Accent,Thickness=2})
 local function ToggleUI(on) Main.Visible=on Floating.Visible=not on end
@@ -181,7 +166,7 @@ Floating.MouseButton1Click:Connect(function() ToggleUI(true) end)
 local TopButtons=Create("Frame",{Parent=Main,Size=UDim2.fromOffset(60,25),Position=UDim2.new(1,-65,0,10),BackgroundTransparency=1})
 Create("UIListLayout",{Parent=TopButtons,FillDirection=Enum.FillDirection.Horizontal,HorizontalAlignment=Enum.HorizontalAlignment.Right,Padding=UDim.new(0,5)})
 local function CreateTopBtn(t,c,cb) local b=Create("TextButton",{Parent=TopButtons,Size=UDim2.fromOffset(24,24),BackgroundColor3=Theme.Card,Text=t,TextColor3=c,TextSize=14,Font=Enum.Font.GothamBold}) Create("UICorner",{Parent=b,CornerRadius=UDim.new(0,6)}) Create("UIStroke",{Parent=b,Color=Theme.Border,Thickness=1}) b.MouseButton1Click:Connect(cb) return b end
-local function CloseHub() Gui:Destroy() for _,p in pairs(Players:GetPlayers()) do HideESP(p) end for _,v in pairs(Connections) do pcall(function() v:Disconnect() end) end for _,v in pairs(Connections2) do pcall(function() v:Disconnect() end) end StopFly() for _,v in pairs(fruitHighlights) do if v and v.Parent then v:Destroy() end end end
+local function CloseHub() Gui:Destroy() for _,p in pairs(Players:GetPlayers()) do HideESP(p) end for _,v in pairs(Connections) do pcall(function() v:Disconnect() end) end StopFly() for _,v in pairs(cashHighlights) do if v and v.Parent then v:Destroy() end end end
 CreateTopBtn("-",Theme.Sub,function() ToggleUI(false) end) CreateTopBtn("×",Color3.fromRGB(255,80,80),CloseHub)
 local MinBtn=Create("TextButton",{Parent=Sidebar,Size=UDim2.new(1,-10,0,30),Position=UDim2.new(0,5,1,-75),BackgroundColor3=Theme.Bg,Text="Minimize",TextColor3=Theme.Sub,TextSize=12,Font=Enum.Font.GothamBold})
 Create("UICorner",{Parent=MinBtn,CornerRadius=UDim.new(0,6)}) MinBtn.MouseButton1Click:Connect(function() ToggleUI(false) end)
@@ -193,7 +178,6 @@ local Tabs={}
 local function CreateTab(name) local btn=Create("TextButton",{Parent=Sidebar,Size=UDim2.new(1,-10,0,35),Position=UDim2.new(0,5,0,60+(#Tabs*40)),BackgroundColor3=Theme.Bg,Text=name,TextColor3=Theme.Sub,TextSize=12,Font=Enum.Font.GothamSemibold}) Create("UICorner",{Parent=btn,CornerRadius=UDim.new(0,6)}) local page=Create("ScrollingFrame",{Parent=TabContainer,Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,Visible=(#Tabs==0),ScrollBarThickness=0,CanvasSize=UDim2.new(0,0,3,0)}) Create("UIListLayout",{Parent=page,Padding=UDim.new(0,5)}) btn.MouseButton1Click:Connect(function() for _,t in pairs(Tabs) do t.Page.Visible=false Tw(t.Btn,{TextColor3=Theme.Sub}) end page.Visible=true Tw(btn,{TextColor3=Theme.Accent}) end) if #Tabs==0 then btn.TextColor3=Theme.Accent end table.insert(Tabs,{Btn=btn,Page=page}) return page end
 
 local function Section(p,t) Create("TextLabel",{Parent=p,Size=UDim2.new(1,0,0,25),BackgroundTransparency=1,Text=t,TextColor3=Theme.Accent,TextSize=11,Font=Enum.Font.GothamBold,TextXAlignment=Enum.TextXAlignment.Left}) end
-local function Button(p,t,cb) local r=Create("Frame",{Parent=p,Size=UDim2.new(1,-5,0,35),BackgroundColor3=Theme.Card,BorderSizePixel=0}) Create("UICorner",{Parent=r,CornerRadius=UDim.new(0,6)}) local b=Create("TextButton",{Parent=r,Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text=t,TextColor3=Theme.Text,TextSize=12,Font=Enum.Font.GothamBold}) b.MouseButton1Click:Connect(cb) end
 local function Toggle(p,name,def,cb)
     local on=def local row=Create("Frame",{Parent=p,Size=UDim2.new(1,-5,0,35),BackgroundColor3=Theme.Card,BorderSizePixel=0}) Create("UICorner",{Parent=row,CornerRadius=UDim.new(0,6)})
     Create("TextLabel",{Parent=row,Size=UDim2.new(1,-50,1,0),Position=UDim2.new(0,10,0,0),BackgroundTransparency=1,Text=name,TextColor3=Theme.Text,TextSize=12,Font=Enum.Font.GothamSemibold,TextXAlignment=Enum.TextXAlignment.Left})
@@ -215,36 +199,25 @@ local function Slider(p,name,min,max,def,cb)
     Connections["Slider_"..name]=UIS.InputChanged:Connect(function(i) if drag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then update(i) end end)
 end
 
-local FarmPage=CreateTab("Farm")
+local CombatPage=CreateTab("Combat")
 local VisPage=CreateTab("Visuals")
 local MovePage=CreateTab("Movement")
 
-Section(FarmPage,"Automation")
-Toggle(FarmPage,"Mob Auto Farm",false,function(v) Settings.AutoFarm=v end)
-Toggle(FarmPage,"Fruit ESP",false,function(v) Settings.FruitESP=v if not v then UpdateFruitESP() end end)
-Toggle(FarmPage,"Auto Haki",false,function(v) Settings.AutoHaki=v end)
-Button(FarmPage,"Teleport to Nearest Fruit",function()
-    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
-    local closest,dist=nil,math.huge
-    for _,obj in pairs(WS:GetDescendants()) do
-        if obj:IsA("Tool") and obj.Parent==WS and obj:FindFirstChild("Handle") then
-            local d=(obj.Handle.Position-LP.Character.HumanoidRootPart.Position).Magnitude
-            if d<dist then closest=obj dist=d end
-        end
-    end
-    if closest and closest:FindFirstChild("Handle") then LP.Character.HumanoidRootPart.CFrame=closest.Handle.CFrame*CFrame.new(0,3,0) end
-end)
+Section(CombatPage,"Combat Mods")
+Toggle(CombatPage,"Auto Stomp",false,function(v) Settings.AutoStomp=v end)
+Toggle(CombatPage,"Auto Block (Proximity)",false,function(v) Settings.AutoBlock=v end)
 
-Section(VisPage,"ESP")
+Section(VisPage,"World ESP")
 Toggle(VisPage,"Player ESP",false,function(v) Settings.PlayerESP=v end)
+Toggle(VisPage,"Cash Drop ESP",false,function(v) Settings.CashESP=v if not v then UpdateCashESP() end end)
 
 Section(MovePage,"Character")
 Toggle(MovePage,"Speed Hack",false,function(v) Settings.Speed=v end)
-Slider(MovePage,"Speed Value",16,500,100,function(v) Settings.SpeedVal=v end)
+Slider(MovePage,"Speed Value",16,150,50,function(v) Settings.SpeedVal=v end)
 Toggle(MovePage,"Infinite Jump",false,function(v) Settings.InfJump=v end)
 Toggle(MovePage,"Noclip",false,function(v) Settings.Noclip=v end)
 Toggle(MovePage,"Fly",false,function(v) Settings.Fly=v if v then StartFly() else StopFly() end end)
-Slider(MovePage,"Fly Speed",10,500,100,function(v) Settings.FlySpeed=v end)
+Slider(MovePage,"Fly Speed",10,200,50,function(v) Settings.FlySpeed=v end)
 
 do local dr,ds,sp
     Connections.D1=Sidebar.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then dr=true ds=i.Position sp=Main.Position end end)
@@ -253,4 +226,4 @@ do local dr,ds,sp
     Connections.D4=UIS.InputBegan:Connect(function(i,g) if not g and i.KeyCode==Enum.KeyCode.RightShift then ToggleUI(not Main.Visible) end end)
 end
 
-print("[KLOSO BLOX FRUITS] Loaded.")
+print("[KLOSO DA HOOD] Loaded.")

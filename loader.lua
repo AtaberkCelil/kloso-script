@@ -46,7 +46,8 @@ local SupportedGames = {
     [10449761463] = {Name = "The Strongest Battlegrounds", File = "tsb.lua"},
     [189707]      = {Name = "Natural Disaster Survival", File = "nds.lua"},
     [2753915549]  = {Name = "Blox Fruits", File = "bloxfruits.lua"},
-    [142823291]   = {Name = "Murder Mystery 2", File = "mm2.lua"}
+    [142823291]   = {Name = "Murder Mystery 2", File = "mm2.lua"},
+    [2788229376]  = {Name = "Da Hood", File = "dahood.lua"}
 }
 
 local BASE_URL = "https://raw.githubusercontent.com/AtaberkCelil/kloso-script/main/"
