@@ -37,7 +37,8 @@ local Settings = {
 		HitboxSize = 10,
 		TeamCheck = false,
         NinjaMacro = false,
-        NinjaKey = Enum.KeyCode.E
+        NinjaKey = Enum.KeyCode.E,
+        NinjaDelay = 0.5
 	},
 	Visuals = {
 		ESP = false,
@@ -185,7 +186,7 @@ Connections.NinjaMacro = UIS.InputBegan:Connect(function(i, g)
             local origCFrame = hrp.CFrame
             -- Teleport under map to execute the Ninja grab
             hrp.CFrame = origCFrame * CFrame.new(0, -150, 0)
-            task.wait(0.35)
+            task.wait(Settings.Combat.NinjaDelay)
             -- Return back
             hrp.CFrame = origCFrame
         end
@@ -396,6 +397,7 @@ Slider(CombatPage, "Aura Range", 5, 25, 10, function(v) Settings.Combat.AuraRang
 Section(CombatPage, "Ninja 3rd Macro")
 Toggle(CombatPage, "Enable Ninja Macro", false, function(v) Settings.Combat.NinjaMacro = v end)
 Keybind(CombatPage, "Macro Bind", Enum.KeyCode.E, function(v) Settings.Combat.NinjaKey = v end)
+Slider(CombatPage, "Teleport Delay (Sec)", 0.1, 3.0, 0.5, function(v) Settings.Combat.NinjaDelay = v end)
 
 Section(CombatPage, "Hitbox Manipulation")
 Toggle(CombatPage, "Hitbox Expander", false, function(v) Settings.Combat.Hitbox = v end)
