@@ -18,6 +18,7 @@ local Theme = {Accent=Color3.fromRGB(255,100,50),Bg=Color3.fromRGB(14,10,10),Car
 
 local Settings = {
     AutoFarm = false, AutoQuest = false, BringMobs = false,
+    Weapon = "",
     FruitESP = false, PlayerESP = false,
     Speed = false, SpeedVal = 100,
     Noclip = false, InfJump = false, Fly = false, FlySpeed = 100,
@@ -104,6 +105,11 @@ task.spawn(function()
         if Settings.AutoFarm then
             local mob = GetNearestMob()
             if mob and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+                -- Auto Equip Weapon
+                if Settings.Weapon ~= "" and LP.Backpack:FindFirstChild(Settings.Weapon) then
+                    LP.Character.Humanoid:EquipTool(LP.Backpack[Settings.Weapon])
+                end
+                
                 -- Teleport slightly above mob
                 LP.Character.HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
                 LP.Character.HumanoidRootPart.CFrame = mob.HumanoidRootPart.CFrame * CFrame.new(0, 7, 0)
@@ -234,12 +240,19 @@ local function Slider(p,name,min,max,def,cb)
     btn.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end end)
     Connections["Slider_"..name]=UIS.InputChanged:Connect(function(i) if drag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then update(i) end end)
 end
+local function TextBox(p,name,def,cb)
+    local row=Create("Frame",{Parent=p,Size=UDim2.new(1,-5,0,35),BackgroundColor3=Theme.Card,BorderSizePixel=0}) Create("UICorner",{Parent=row,CornerRadius=UDim.new(0,6)})
+    Create("TextLabel",{Parent=row,Size=UDim2.new(0.5,0,1,0),Position=UDim2.new(0,10,0,0),BackgroundTransparency=1,Text=name,TextColor3=Theme.Text,TextSize=12,Font=Enum.Font.GothamSemibold,TextXAlignment=Enum.TextXAlignment.Left})
+    local box=Create("TextBox",{Parent=row,Size=UDim2.new(0.5,-15,0,25),Position=UDim2.new(0.5,5,0.5,0),AnchorPoint=Vector2.new(0,0.5),BackgroundColor3=Theme.Bg,Text=def,TextColor3=Theme.Text,TextSize=11,Font=Enum.Font.Gotham,ClearTextOnFocus=false}) Create("UICorner",{Parent=box,CornerRadius=UDim.new(0,4)}) Create("UIStroke",{Parent=box,Color=Theme.Border,Thickness=1})
+    box.FocusLost:Connect(function() cb(box.Text) end)
+end
 
 local FarmPage=CreateTab("Farm")
 local VisPage=CreateTab("Visuals")
 local MovePage=CreateTab("Movement")
 
 Section(FarmPage,"Automation")
+TextBox(FarmPage,"Weapon Name","",function(v) Settings.Weapon=v end)
 Toggle(FarmPage,"Mob Auto Farm",false,function(v) Settings.AutoFarm=v end)
 Toggle(FarmPage,"Bring Mobs (Magnet)",false,function(v) Settings.BringMobs=v end)
 Toggle(FarmPage,"Fruit ESP",false,function(v) Settings.FruitESP=v if not v then UpdateFruitESP() end end)
