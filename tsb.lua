@@ -306,10 +306,21 @@ local function CreateTopBtn(text, color, callback)
 	return b
 end
 
-CreateTopBtn("-", Theme.Sub, function() ToggleUI(false) end)
-CreateTopBtn("×", Color3.fromRGB(255, 80, 80), function() 
+local function CloseHub()
 	Gui:Destroy() for _, p in pairs(Players:GetPlayers()) do HideESP(p) end for _,v in pairs(Connections) do pcall(function() v:Disconnect() end) end
-end)
+end
+
+CreateTopBtn("-", Theme.Sub, function() ToggleUI(false) end)
+CreateTopBtn("×", Color3.fromRGB(255, 80, 80), CloseHub)
+
+-- Explicit Sidebar Buttons
+local MinimizeBtn = Create("TextButton", {Parent = Sidebar, Size = UDim2.new(1, -10, 0, 30), Position = UDim2.new(0, 5, 1, -75), BackgroundColor3 = Theme.Bg, Text = "Minimize", TextColor3 = Theme.Sub, TextSize = 12, Font = Enum.Font.GothamBold})
+Create("UICorner", {Parent = MinimizeBtn, CornerRadius = UDim.new(0, 6)})
+MinimizeBtn.MouseButton1Click:Connect(function() ToggleUI(false) end)
+
+local CloseBtn = Create("TextButton", {Parent = Sidebar, Size = UDim2.new(1, -10, 0, 30), Position = UDim2.new(0, 5, 1, -40), BackgroundColor3 = Color3.fromRGB(200, 50, 50), Text = "Close Hub", TextColor3 = Color3.new(1,1,1), TextSize = 12, Font = Enum.Font.GothamBold})
+Create("UICorner", {Parent = CloseBtn, CornerRadius = UDim.new(0, 6)})
+CloseBtn.MouseButton1Click:Connect(CloseHub)
 
 local TabContainer = Create("Frame", {Parent = Main, Size = UDim2.new(1, -130, 1, -20), Position = UDim2.new(0, 130, 0, 10), BackgroundTransparency = 1})
 local Tabs = {}
