@@ -57,7 +57,8 @@ local Settings = {
 		SpeedVal = 16,
         Noclip = false,
         InfJump = false,
-        Bhop = false
+        Bhop = false,
+        Fullbright = false
 	},
 	Menu = {
 		ToggleKey = Enum.KeyCode.RightShift,
@@ -358,6 +359,11 @@ task.spawn(function()
     end
 end)
 
+local function SetFullbright(on)
+    if on then Lighting.Brightness=2 Lighting.ClockTime=14 Lighting.FogEnd=100000 Lighting.GlobalShadows=false
+    else Lighting.Brightness=1 Lighting.GlobalShadows=true end
+end
+
 -- [[ UI SYSTEM ]]
 local oldGui = (gethui or function() return CoreGui end)():FindFirstChild("KlosoArsenal")
 if oldGui then oldGui:Destroy() end
@@ -472,6 +478,8 @@ Slider(PlayerPage, "Speed Value", 16, 250, 16, function(v) Settings.Movement.Spe
 Toggle(PlayerPage, "Infinite Jump", false, function(v) Settings.Movement.InfJump = v end)
 Toggle(PlayerPage, "Bunny Hop (Bhop)", false, function(v) Settings.Movement.Bhop = v end)
 Toggle(PlayerPage, "Noclip", false, function(v) Settings.Movement.Noclip = v end)
+Toggle(PlayerPage, "Fullbright", false, function(v) Settings.Movement.Fullbright = v SetFullbright(v) end)
+Toggle(PlayerPage, "Crosshair", false, function(v) Settings.Combat.Crosshair = v end)
 
 -- Config
 Section(ConfigPage, "Configuration System")

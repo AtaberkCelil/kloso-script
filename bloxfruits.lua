@@ -17,14 +17,35 @@ local Connections = {}
 local Theme = {Accent=Color3.fromRGB(255,100,50),Bg=Color3.fromRGB(14,10,10),Card=Color3.fromRGB(24,18,18),Border=Color3.fromRGB(60,30,30),Text=Color3.fromRGB(250,240,235),Sub=Color3.fromRGB(180,160,155)}
 
 local Settings = {
-    AutoFarm = false, AutoQuest = false, BringMobs = false,
-    Weapon = "",
+    AutoFarm = false, AutoQuest = false, BringMobs = false, BringRange = 300,
+    Weapon = "", KillAura = false, AuraRange = 15,
     FruitESP = false, PlayerESP = false,
     Speed = false, SpeedVal = 100,
     Noclip = false, InfJump = false, Fly = false, FlySpeed = 100,
-    AutoHaki = false, Fullbright = false
+    AutoHaki = false, Fullbright = false, AntiFling = false
 }
-local Connections2 = {}
+
+local ConfigName = "KlosoHub_BloxFruits.json"
+local function SaveConfig()
+    pcall(function()
+        if not isfolder("KlosoHub") then makefolder("KlosoHub") end
+        writefile("KlosoHub/"..ConfigName, HttpService:JSONEncode(Settings))
+        StarterGui:SetCore("SendNotification",{Title="KLOSO",Text="Config Saved!",Duration=2})
+    end)
+end
+local function LoadConfig()
+    pcall(function()
+        if isfile("KlosoHub/"..ConfigName) then
+            local d = HttpService:JSONDecode(readfile("KlosoHub/"..ConfigName))
+            for k,v in pairs(d) do Settings[k]=v end
+        end
+    end)
+end
+local function SetFullbright(on)
+    local L = game:GetService("Lighting")
+    if on then L.Brightness=2 L.ClockTime=14 L.FogEnd=100000 L.GlobalShadows=false
+    else L.Brightness=1 L.GlobalShadows=true end
+end
 
 local function Create(cl,p) local i=Instance.new(cl) for k,v in pairs(p) do if k~="Parent" then pcall(function() i[k]=v end) end end if p.Parent then i.Parent=p.Parent end return i end
 local function Tw(o,g) TweenService:Create(o, TweenInfo.new(0.25, Enum.EasingStyle.Quart), g):Play() end
@@ -144,6 +165,41 @@ task.spawn(function()
                         end
                     end
                 end
+            end
+        end
+    end
+end)
+
+-- Kill Aura
+local lastAuraTick = 0
+task.spawn(function()
+    while task.wait(0.05) do
+        if Settings.KillAura and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            for _,p in pairs(Players:GetPlayers()) do
+                if p~=LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health>0 then
+                    local dist = (LP.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                    if dist < Settings.AuraRange then
+                        Camera.CFrame = CFrame.new(Camera.CFrame.Position, p.Character.HumanoidRootPart.Position)
+                        if tick()-lastAuraTick > 0.1 then
+                            if mouse1click then mouse1click() end
+                            lastAuraTick = tick()
+                        end
+                        break
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Anti-Fling
+task.spawn(function()
+    while task.wait() do
+        if Settings.AntiFling and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            local vel = LP.Character.HumanoidRootPart.Velocity
+            if vel.Magnitude > 120 then
+                LP.Character.HumanoidRootPart.Velocity = Vector3.new(0,0,0)
+                LP.Character.HumanoidRootPart.RotVelocity = Vector3.new(0,0,0)
             end
         end
     end
@@ -279,6 +335,17 @@ Toggle(MovePage,"Infinite Jump",false,function(v) Settings.InfJump=v end)
 Toggle(MovePage,"Noclip",false,function(v) Settings.Noclip=v end)
 Toggle(MovePage,"Fly",false,function(v) Settings.Fly=v if v then StartFly() else StopFly() end end)
 Slider(MovePage,"Fly Speed",10,500,100,function(v) Settings.FlySpeed=v end)
+Toggle(MovePage,"Anti-Fling",false,function(v) Settings.AntiFling=v end)
+Toggle(MovePage,"Fullbright",false,function(v) Settings.Fullbright=v SetFullbright(v) end)
+
+Section(FarmPage,"Combat")
+Toggle(FarmPage,"Kill Aura (PvP)",false,function(v) Settings.KillAura=v end)
+Slider(FarmPage,"Aura Range",5,30,15,function(v) Settings.AuraRange=v end)
+
+local ConfigPage=CreateTab("Config")
+Section(ConfigPage,"Save & Load")
+Button(ConfigPage,"Save Config",SaveConfig)
+Button(ConfigPage,"Load Config",LoadConfig)
 
 do local dr,ds,sp
     Connections.D1=Sidebar.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then dr=true ds=i.Position sp=Main.Position end end)

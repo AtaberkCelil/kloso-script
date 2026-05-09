@@ -57,7 +57,10 @@ local Settings = {
 		SpeedVal = 50,
         Noclip = false,
         InfJump = false,
-        Bhop = false
+        Bhop = false,
+        Fly = false,
+        FlySpeed = 50,
+        Fullbright = false
 	},
 	Menu = {
 		ToggleKey = Enum.KeyCode.RightShift,
@@ -331,6 +334,32 @@ task.spawn(function()
     end
 end)
 
+-- Fly
+local flyBV,flyBG,flying=nil,nil,false
+local function StartFly()
+    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
+    local hrp=LP.Character.HumanoidRootPart flying=true
+    flyBV=Instance.new("BodyVelocity",hrp) flyBV.MaxForce=Vector3.new(math.huge,math.huge,math.huge) flyBV.Velocity=Vector3.new(0,0,0)
+    flyBG=Instance.new("BodyGyro",hrp) flyBG.MaxTorque=Vector3.new(math.huge,math.huge,math.huge) flyBG.D=200 flyBG.P=10000
+    Connections.FlyLoop=RS.RenderStepped:Connect(function()
+        if not flying or not flyBV or not flyBV.Parent then return end
+        local dir=Vector3.new(0,0,0) local cf=Camera.CFrame
+        if UIS:IsKeyDown(Enum.KeyCode.W) then dir=dir+cf.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then dir=dir-cf.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then dir=dir-cf.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then dir=dir+cf.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then dir=dir+Vector3.new(0,1,0) end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then dir=dir-Vector3.new(0,1,0) end
+        flyBV.Velocity=dir*Settings.Movement.FlySpeed flyBG.CFrame=cf
+    end)
+end
+local function StopFly() flying=false if flyBV then flyBV:Destroy() flyBV=nil end if flyBG then flyBG:Destroy() flyBG=nil end if Connections.FlyLoop then Connections.FlyLoop:Disconnect() end end
+
+local function SetFullbright(on)
+    if on then Lighting.Brightness=2 Lighting.ClockTime=14 Lighting.FogEnd=100000 Lighting.GlobalShadows=false
+    else Lighting.Brightness=1 Lighting.GlobalShadows=true end
+end
+
 -- [[ UI SYSTEM ]]
 local oldGui = (gethui or function() return CoreGui end)():FindFirstChild("KlosoRivals")
 if oldGui then oldGui:Destroy() end
@@ -445,6 +474,9 @@ Slider(PlayerPage, "Speed Value", 16, 250, 50, function(v) Settings.Movement.Spe
 Toggle(PlayerPage, "Infinite Jump", false, function(v) Settings.Movement.InfJump = v end)
 Toggle(PlayerPage, "Bunny Hop (Bhop)", false, function(v) Settings.Movement.Bhop = v end)
 Toggle(PlayerPage, "Noclip", false, function(v) Settings.Movement.Noclip = v end)
+Toggle(PlayerPage, "Fly", false, function(v) Settings.Movement.Fly = v if v then StartFly() else StopFly() end end)
+Slider(PlayerPage, "Fly Speed", 10, 200, 50, function(v) Settings.Movement.FlySpeed = v end)
+Toggle(PlayerPage, "Fullbright", false, function(v) Settings.Movement.Fullbright = v SetFullbright(v) end)
 
 -- Config
 Section(ConfigPage, "Configuration System")

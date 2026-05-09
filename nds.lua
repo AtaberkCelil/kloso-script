@@ -38,12 +38,19 @@ local Settings = {
         JumpVal = 50,
         Noclip = false,
         InfJump = false,
-        Fling = false
+        Fling = false,
+        AntiVoid = false,
+        Fullbright = false
+	},
+	Visuals = {
+		PlayerESP = false
 	},
 	Menu = {
 		ToggleKey = Enum.KeyCode.RightShift
 	}
 }
+local lastSafePos = nil
+local Camera = WS.CurrentCamera
 
 local Connections = {}
 
@@ -209,6 +216,56 @@ Connections.FlingLoop = RS.Stepped:Connect(function()
     end
 end)
 
+-- Anti-Void
+task.spawn(function()
+    while task.wait() do
+        if Settings.Movement.AntiVoid and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            local pos = LP.Character.HumanoidRootPart.Position
+            if pos.Y > 5 then lastSafePos = LP.Character.HumanoidRootPart.CFrame end
+            if pos.Y < -20 and lastSafePos then
+                LP.Character.HumanoidRootPart.CFrame = lastSafePos
+            end
+        end
+    end
+end)
+
+-- Fullbright
+local function SetFullbright(on)
+    local L = game:GetService("Lighting")
+    if on then L.Brightness=2 L.ClockTime=14 L.FogEnd=100000 L.GlobalShadows=false
+    else L.Brightness=1 L.GlobalShadows=true end
+end
+
+-- Player ESP
+local ESP_Objects = {}
+local function GetESPObj(p)
+    if not ESP_Objects[p] then
+        ESP_Objects[p] = {Box=Drawing.new("Square"),BoxO=Drawing.new("Square"),Name=Drawing.new("Text")}
+        local o=ESP_Objects[p] o.Box.Thickness=1 o.Box.Filled=false o.BoxO.Thickness=3 o.BoxO.Filled=false o.BoxO.Color=Color3.new(0,0,0)
+        o.Name.Size=14 o.Name.Center=true o.Name.Outline=true
+    end return ESP_Objects[p]
+end
+local function HideESP(p) if ESP_Objects[p] then for _,v in pairs(ESP_Objects[p]) do v.Visible=false end end end
+Players.PlayerRemoving:Connect(function(p) if ESP_Objects[p] then for _,v in pairs(ESP_Objects[p]) do v:Remove() end ESP_Objects[p]=nil end end)
+
+Connections.ESPLoop = RS.RenderStepped:Connect(function()
+    for _,p in pairs(Players:GetPlayers()) do
+        if p==LP then continue end
+        local char=p.Character
+        if not Settings.Visuals.PlayerESP or not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") or char.Humanoid.Health<=0 then HideESP(p) continue end
+        local hrp=char.HumanoidRootPart
+        local pos,onScreen=Camera:WorldToViewportPoint(hrp.Position) local obs=GetESPObj(p)
+        if onScreen then
+            local rp=Camera:WorldToViewportPoint(hrp.Position-Vector3.new(0,3,0))
+            local hp2=Camera:WorldToViewportPoint(hrp.Position+Vector3.new(0,2.5,0))
+            local bH=math.abs(hp2.Y-rp.Y) local bW=bH*0.6
+            obs.BoxO.Size=Vector2.new(bW,bH) obs.BoxO.Position=Vector2.new(rp.X-bW/2,hp2.Y) obs.BoxO.Visible=true
+            obs.Box.Size=Vector2.new(bW,bH) obs.Box.Position=Vector2.new(rp.X-bW/2,hp2.Y) obs.Box.Color=Theme.Accent obs.Box.Visible=true
+            obs.Name.Text=p.Name obs.Name.Position=Vector2.new(rp.X,hp2.Y-18) obs.Name.Color=Theme.Text obs.Name.Visible=true
+        else HideESP(p) end
+    end
+end)
+
 
 -- [[ UI SYSTEM ]]
 local oldGui = (gethui or function() return CoreGui end)():FindFirstChild("KlosoNDS")
@@ -316,12 +373,24 @@ Toggle(PlayerPage, "JumpPower Hack", false, function(v) Settings.Movement.Jump =
 Slider(PlayerPage, "Jump Value", 50, 300, 80, function(v) Settings.Movement.JumpVal = v end)
 Toggle(PlayerPage, "Infinite Jump", false, function(v) Settings.Movement.InfJump = v end)
 Toggle(PlayerPage, "Noclip", false, function(v) Settings.Movement.Noclip = v end)
+Toggle(PlayerPage, "Anti-Void", false, function(v) Settings.Movement.AntiVoid = v end)
 
 Section(PlayerPage, "Admin Tools")
 Toggle(PlayerPage, "Enable Fling (Spin)", false, function(v) Settings.Movement.Fling = v end)
+Toggle(PlayerPage, "Fullbright", false, function(v) Settings.Movement.Fullbright = v SetFullbright(v) end)
+Button(PlayerPage, "Teleport to Roof", function()
+    if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        LP.Character.HumanoidRootPart.CFrame = CFrame.new(LP.Character.HumanoidRootPart.Position.X, 200, LP.Character.HumanoidRootPart.Position.Z)
+    end
+end)
 Button(PlayerPage, "Load Infinite Yield", function()
     loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
 end)
+
+-- Visuals Tab
+local VisPage = CreateTab("Visuals")
+Section(VisPage, "ESP")
+Toggle(VisPage, "Player ESP", false, function(v) Settings.Visuals.PlayerESP = v end)
 
 -- Config
 Section(ConfigPage, "Configuration System")

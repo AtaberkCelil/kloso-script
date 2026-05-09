@@ -30,8 +30,25 @@ local Settings = {
     Noclip = false, InfJump = false, Bhop = false,
     Fly = false, FlySpeed = 50,
     AntiAFK = true, Fullbright = false,
-    Fling = false
+    Fling = false, GodMode = false
 }
+
+local ConfigName = "KlosoHub_Universal.json"
+local function SaveConfig()
+    pcall(function()
+        if not isfolder("KlosoHub") then makefolder("KlosoHub") end
+        writefile("KlosoHub/"..ConfigName, HttpService:JSONEncode(Settings))
+        StarterGui:SetCore("SendNotification",{Title="KLOSO",Text="Config Saved!",Duration=2})
+    end)
+end
+local function LoadConfig()
+    pcall(function()
+        if isfile("KlosoHub/"..ConfigName) then
+            local d = HttpService:JSONDecode(readfile("KlosoHub/"..ConfigName))
+            for k,v in pairs(d) do Settings[k]=v end
+        end
+    end)
+end
 
 local function Create(cl,p) local i=Instance.new(cl) for k,v in pairs(p) do if k~="Parent" then pcall(function() i[k]=v end) end end if p.Parent then i.Parent=p.Parent end return i end
 local function Tw(o,g) TweenService:Create(o, TweenInfo.new(0.25, Enum.EasingStyle.Quart), g):Play() end
@@ -101,6 +118,7 @@ end)
 task.spawn(function() while task.wait(0.5) do if LP.Character and LP.Character:FindFirstChild("Humanoid") then
     if Settings.Speed then LP.Character.Humanoid.WalkSpeed = Settings.SpeedVal end
     if Settings.Jump then LP.Character.Humanoid.JumpPower = Settings.JumpVal LP.Character.Humanoid.UseJumpPower = true end
+    if Settings.GodMode then LP.Character.Humanoid.Health = LP.Character.Humanoid.MaxHealth end
 end end end)
 
 -- ESP
@@ -234,9 +252,38 @@ Section(ToolsPage,"Utilities")
 Toggle(ToolsPage,"Anti-AFK",true,function(v) Settings.AntiAFK=v end)
 Toggle(ToolsPage,"Fullbright",false,function(v) Settings.Fullbright=v SetFullbright(v) end)
 Toggle(ToolsPage,"Fling",false,function(v) Settings.Fling=v end)
+Toggle(ToolsPage,"God Mode (Health Loop)",false,function(v) Settings.GodMode=v end)
 Button(ToolsPage,"Load Infinite Yield",function() loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))() end)
 Button(ToolsPage,"Load KILASIK Multi-Fling",function() loadstring(game:HttpGet('https://raw.githubusercontent.com/AtaberkCelil/kloso-script/main/fling.lua'))() end)
-Button(ToolsPage,"Rejoin Server",function() TweenService:Create(game:GetService("TeleportService"),TweenInfo.new(0),{}):Cancel() game:GetService("TeleportService"):Teleport(game.PlaceId,LP) end)
+Button(ToolsPage,"Rejoin Server",function() game:GetService("TeleportService"):Teleport(game.PlaceId,LP) end)
+Button(ToolsPage,"Server Hop",function()
+    pcall(function()
+        local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"))
+        for _,s in pairs(servers.data) do
+            if s.playing < s.maxPlayers and s.id ~= game.JobId then
+                game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, s.id, LP)
+                break
+            end
+        end
+    end)
+end)
+
+Section(ToolsPage,"Player Utilities")
+Button(ToolsPage,"TP to Nearest Player",function()
+    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
+    local best,dist = nil,math.huge
+    for _,p in pairs(Players:GetPlayers()) do
+        if p~=LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local d=(LP.Character.HumanoidRootPart.Position-p.Character.HumanoidRootPart.Position).Magnitude
+            if d<dist then best=p dist=d end
+        end
+    end
+    if best then LP.Character.HumanoidRootPart.CFrame=best.Character.HumanoidRootPart.CFrame*CFrame.new(0,0,3) end
+end)
+
+Section(ToolsPage,"Config")
+Button(ToolsPage,"Save Config",SaveConfig)
+Button(ToolsPage,"Load Config",LoadConfig)
 
 do local dr,ds,sp
     Connections.D1=Sidebar.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then dr=true ds=i.Position sp=Main.Position end end)

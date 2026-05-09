@@ -13,13 +13,40 @@ local Connections = {}
 
 local Theme = {Accent=Color3.fromRGB(200,50,80),Bg=Color3.fromRGB(14,10,12),Card=Color3.fromRGB(24,18,22),Border=Color3.fromRGB(60,30,40),Text=Color3.fromRGB(250,240,245),Sub=Color3.fromRGB(180,160,170)}
 
+local HttpService = cloneref(game:GetService("HttpService"))
+local StarterGui = cloneref(game:GetService("StarterGui"))
+local Lighting = cloneref(game:GetService("Lighting"))
+
 local Settings = {
     MurdererESP = true, SheriffESP = true,
     PlayerESP = false, CoinESP = false,
     AutoCoin = false, FlingMurderer = false,
+    GrabGun = false, XRay = false, MurdAlert = false, Fullbright = false,
     Speed = false, SpeedVal = 25,
     Noclip = false, InfJump = false, Fly = false, FlySpeed = 50
 }
+
+local ConfigName = "KlosoHub_MM2.json"
+local function SaveConfig()
+    pcall(function()
+        if not isfolder("KlosoHub") then makefolder("KlosoHub") end
+        writefile("KlosoHub/"..ConfigName, HttpService:JSONEncode(Settings))
+        StarterGui:SetCore("SendNotification",{Title="KLOSO",Text="Config Saved!",Duration=2})
+    end)
+end
+local function LoadConfig()
+    pcall(function()
+        if isfile("KlosoHub/"..ConfigName) then
+            local d = HttpService:JSONDecode(readfile("KlosoHub/"..ConfigName))
+            for k,v in pairs(d) do Settings[k]=v end
+            StarterGui:SetCore("SendNotification",{Title="KLOSO",Text="Config Loaded!",Duration=2})
+        end
+    end)
+end
+local function SetFullbright(on)
+    if on then Lighting.Brightness=2 Lighting.ClockTime=14 Lighting.FogEnd=100000 Lighting.GlobalShadows=false
+    else Lighting.Brightness=1 Lighting.GlobalShadows=true end
+end
 
 local function Create(cl,p) local i=Instance.new(cl) for k,v in pairs(p) do if k~="Parent" then pcall(function() i[k]=v end) end end if p.Parent then i.Parent=p.Parent end return i end
 local function Tw(o,g) TweenService:Create(o, TweenInfo.new(0.25, Enum.EasingStyle.Quart), g):Play() end
@@ -165,6 +192,69 @@ task.spawn(function()
     end
 end)
 
+-- Gun Grab (pick up dropped gun)
+task.spawn(function()
+    while task.wait(0.2) do
+        if Settings.GrabGun and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            for _,tool in pairs(WS:GetChildren()) do
+                if tool:IsA("Tool") and (tool.Name=="Gun" or tool.Name=="Revolver" or tool.Name:lower():find("gun")) and tool:FindFirstChild("Handle") then
+                    LP.Character.HumanoidRootPart.CFrame = tool.Handle.CFrame
+                    if firetouchinterest then firetouchinterest(LP.Character.HumanoidRootPart,tool.Handle,0) firetouchinterest(LP.Character.HumanoidRootPart,tool.Handle,1) end
+                end
+            end
+        end
+    end
+end)
+
+-- X-Ray Vision
+local xrayParts = {}
+local function SetXRay(on)
+    if on then
+        for _,p in pairs(WS:GetDescendants()) do
+            if p:IsA("BasePart") and p.Transparency < 0.5 and not p.Parent:FindFirstChild("Humanoid") then
+                xrayParts[p] = p.Transparency
+                p.Transparency = 0.7
+            end
+        end
+    else
+        for p,t in pairs(xrayParts) do pcall(function() p.Transparency = t end) end
+        xrayParts = {}
+    end
+end
+
+-- Murderer Proximity Alert
+local lastAlertTick = 0
+task.spawn(function()
+    while task.wait(0.5) do
+        if Settings.MurdAlert and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            for _,p in pairs(Players:GetPlayers()) do
+                if p~=LP and GetRole(p)=="Murderer" and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = (LP.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                    if dist < 30 and tick()-lastAlertTick > 5 then
+                        StarterGui:SetCore("SendNotification",{Title="⚠️ DANGER",Text="Murderer is "..math.floor(dist).." studs away!",Duration=3})
+                        lastAlertTick = tick()
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Role Notification at round start
+task.spawn(function()
+    while task.wait(3) do
+        for _,p in pairs(Players:GetPlayers()) do
+            if p~=LP then
+                local role = GetRole(p)
+                if role ~= "Innocent" then
+                    pcall(function() StarterGui:SetCore("SendNotification",{Title="Role Detected",Text=p.Name.." is the "..role,Duration=5}) end)
+                end
+            end
+        end
+        task.wait(15)
+    end
+end)
+
 -- Fling Murderer
 local FlingVel
 task.spawn(function()
@@ -288,14 +378,18 @@ local MovePage=CreateTab("Movement")
 Section(FarmPage,"Automation")
 Toggle(FarmPage,"Auto Collect Coins",false,function(v) Settings.AutoCoin=v end)
 Toggle(FarmPage,"Fling Murderer (Auto Kill)",false,function(v) Settings.FlingMurderer=v end)
+Toggle(FarmPage,"Auto Grab Gun",false,function(v) Settings.GrabGun=v end)
 
 Section(RolePage,"Role Detection ESP")
 Toggle(RolePage,"Murderer ESP (Red)",true,function(v) Settings.MurdererESP=v end)
 Toggle(RolePage,"Sheriff ESP (Blue)",true,function(v) Settings.SheriffESP=v end)
 Toggle(RolePage,"All Players ESP",false,function(v) Settings.PlayerESP=v end)
+Toggle(RolePage,"Murderer Proximity Alert",false,function(v) Settings.MurdAlert=v end)
 
 Section(VisPage,"World ESP")
 Toggle(VisPage,"Coin/Gem ESP",false,function(v) Settings.CoinESP=v if not v then UpdateCoinESP() end end)
+Toggle(VisPage,"X-Ray Vision",false,function(v) Settings.XRay=v SetXRay(v) end)
+Toggle(VisPage,"Fullbright",false,function(v) Settings.Fullbright=v SetFullbright(v) end)
 
 Section(MovePage,"Character")
 Toggle(MovePage,"Speed Hack",false,function(v) Settings.Speed=v end)

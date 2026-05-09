@@ -38,7 +38,11 @@ local Settings = {
 		TeamCheck = false,
         NinjaMacro = false,
         NinjaKey = Enum.KeyCode.E,
-        NinjaDelay = 0.5
+        NinjaDelay = 0.5,
+        AutoDodge = false,
+        AutoCombo = false,
+        ComboDelay = 0.15,
+        TpBehind = false
 	},
 	Visuals = {
 		ESP = false,
@@ -52,7 +56,9 @@ local Settings = {
 		SpeedVal = 25,
         Noclip = false,
         InfJump = false,
-        Bhop = false
+        Bhop = false,
+        AntiFling = false,
+        Fullbright = false
 	},
 	Menu = {
 		ToggleKey = Enum.KeyCode.RightShift
@@ -192,6 +198,75 @@ Connections.NinjaMacro = UIS.InputBegan:Connect(function(i, g)
         end
     end
 end)
+
+-- Auto Dodge
+task.spawn(function()
+    while task.wait(0.05) do
+        if Settings.Combat.AutoDodge and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            for _,p in pairs(Players:GetPlayers()) do
+                if p~=LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health>0 then
+                    local dist = (LP.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                    if dist < 8 then
+                        pcall(function()
+                            for _,anim in pairs(p.Character.Humanoid:GetPlayingAnimationTracks()) do
+                                if anim.Name:lower():find("punch") or anim.Name:lower():find("attack") or anim.Name:lower():find("swing") then
+                                    local side = (math.random() > 0.5) and 5 or -5
+                                    LP.Character.HumanoidRootPart.CFrame = LP.Character.HumanoidRootPart.CFrame * CFrame.new(side, 0, -3)
+                                    break
+                                end
+                            end
+                        end)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Auto Combo
+local lastCombo = 0
+task.spawn(function()
+    while task.wait(0.01) do
+        if Settings.Combat.AutoCombo then
+            local target = GetClosestToPlayer(12)
+            if target and tick()-lastCombo > Settings.Combat.ComboDelay then
+                if mouse1click then mouse1click() end
+                lastCombo = tick()
+            end
+        end
+    end
+end)
+
+-- Teleport Behind
+task.spawn(function()
+    while task.wait(0.05) do
+        if Settings.Combat.TpBehind and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            local target = GetClosestToPlayer(15)
+            if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                LP.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3.5)
+            end
+        end
+    end
+end)
+
+-- Anti-Fling
+task.spawn(function()
+    while task.wait() do
+        if Settings.Movement.AntiFling and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            local vel = LP.Character.HumanoidRootPart.Velocity
+            if vel.Magnitude > 100 then
+                LP.Character.HumanoidRootPart.Velocity = Vector3.new(0,0,0)
+                LP.Character.HumanoidRootPart.RotVelocity = Vector3.new(0,0,0)
+            end
+        end
+    end
+end)
+
+-- Fullbright
+local function SetFullbright(on)
+    if on then Lighting.Brightness=2 Lighting.ClockTime=14 Lighting.FogEnd=100000 Lighting.GlobalShadows=false
+    else Lighting.Brightness=1 Lighting.GlobalShadows=true end
+end
 
 -- [[ VISUALS LOGIC ]]
 local ESP_Objects = {}
@@ -415,6 +490,14 @@ Slider(PlayerPage, "Speed Value", 16, 250, 25, function(v) Settings.Movement.Spe
 Toggle(PlayerPage, "Infinite Jump", false, function(v) Settings.Movement.InfJump = v end)
 Toggle(PlayerPage, "Bunny Hop (Bhop)", false, function(v) Settings.Movement.Bhop = v end)
 Toggle(PlayerPage, "Noclip", false, function(v) Settings.Movement.Noclip = v end)
+Toggle(PlayerPage, "Anti-Fling", false, function(v) Settings.Movement.AntiFling = v end)
+Toggle(PlayerPage, "Fullbright", false, function(v) Settings.Movement.Fullbright = v SetFullbright(v) end)
+
+Section(CombatPage, "Auto Combat")
+Toggle(CombatPage, "Auto Dodge", false, function(v) Settings.Combat.AutoDodge = v end)
+Toggle(CombatPage, "Auto Combo (M1 Chain)", false, function(v) Settings.Combat.AutoCombo = v end)
+Slider(CombatPage, "Combo Delay", 0.05, 0.5, 0.15, function(v) Settings.Combat.ComboDelay = v end)
+Toggle(CombatPage, "Teleport Behind Target", false, function(v) Settings.Combat.TpBehind = v end)
 
 -- Config
 Section(ConfigPage, "Configuration System")

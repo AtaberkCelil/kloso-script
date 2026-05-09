@@ -12,13 +12,38 @@ local Camera = WS.CurrentCamera
 local Connections = {}
 
 local Theme = {Accent=Color3.fromRGB(255,100,50),Bg=Color3.fromRGB(14,10,10),Card=Color3.fromRGB(24,18,18),Border=Color3.fromRGB(60,30,30),Text=Color3.fromRGB(250,240,235),Sub=Color3.fromRGB(180,160,155)}
+local HttpService = cloneref(game:GetService("HttpService"))
+local StarterGui = cloneref(game:GetService("StarterGui"))
+local Lighting = cloneref(game:GetService("Lighting"))
 
 local Settings = {
-    Killaura = false, AuraRange = 18, Velocity = false,
-    PlayerESP = false, BedESP = false,
-    Speed = false, SpeedVal = 20,
+    Killaura = false, AuraRange = 18, Velocity = false, Reach = false, ReachVal = 18,
+    PlayerESP = false, BedESP = false, Tracers = false,
+    Speed = false, SpeedVal = 20, AntiVoid = false, Fullbright = false,
     Noclip = false, InfJump = false, Fly = false, FlySpeed = 25
 }
+local lastSafePos = nil
+
+local ConfigName = "KlosoHub_Bedwars.json"
+local function SaveConfig()
+    pcall(function()
+        if not isfolder("KlosoHub") then makefolder("KlosoHub") end
+        writefile("KlosoHub/"..ConfigName, HttpService:JSONEncode(Settings))
+        StarterGui:SetCore("SendNotification",{Title="KLOSO",Text="Config Saved!",Duration=2})
+    end)
+end
+local function LoadConfig()
+    pcall(function()
+        if isfile("KlosoHub/"..ConfigName) then
+            local d = HttpService:JSONDecode(readfile("KlosoHub/"..ConfigName))
+            for k,v in pairs(d) do Settings[k]=v end
+        end
+    end)
+end
+local function SetFullbright(on)
+    if on then Lighting.Brightness=2 Lighting.ClockTime=14 Lighting.FogEnd=100000 Lighting.GlobalShadows=false
+    else Lighting.Brightness=1 Lighting.GlobalShadows=true end
+end
 
 local function Create(cl,p) local i=Instance.new(cl) for k,v in pairs(p) do if k~="Parent" then pcall(function() i[k]=v end) end end if p.Parent then i.Parent=p.Parent end return i end
 local function Tw(o,g) TweenService:Create(o, TweenInfo.new(0.25, Enum.EasingStyle.Quart), g):Play() end
@@ -115,12 +140,35 @@ task.spawn(function()
             end
         end
         
-        -- Anti-Knockback
+        -- Anti-Knockback (full)
         if Settings.Velocity and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
-            -- Simple velocity clamp
             local vel = LP.Character.HumanoidRootPart.Velocity
-            if vel.Y > 0 then
-                LP.Character.HumanoidRootPart.Velocity = Vector3.new(vel.X, 0, vel.Z)
+            if vel.Magnitude > 60 then
+                LP.Character.HumanoidRootPart.Velocity = Vector3.new(0,0,0)
+            end
+        end
+        
+        -- Reach
+        if Settings.Reach and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            local enemy = GetNearestEnemy()
+            if enemy and enemy.Character and enemy.Character:FindFirstChild("HumanoidRootPart") then
+                local dist = (LP.Character.HumanoidRootPart.Position - enemy.Character.HumanoidRootPart.Position).Magnitude
+                if dist < Settings.ReachVal and dist > 5 then
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, enemy.Character.HumanoidRootPart.Position)
+                    if tick() - lastAuraTick > 0.1 then
+                        if mouse1click then mouse1click() end
+                        lastAuraTick = tick()
+                    end
+                end
+            end
+        end
+        
+        -- Anti-Void
+        if Settings.AntiVoid and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            local pos = LP.Character.HumanoidRootPart.Position
+            if pos.Y > 5 then lastSafePos = LP.Character.HumanoidRootPart.CFrame end
+            if pos.Y < -20 and lastSafePos then
+                LP.Character.HumanoidRootPart.CFrame = lastSafePos
             end
         end
     end
@@ -211,18 +259,22 @@ local MovePage=CreateTab("Movement")
 Section(CombatPage,"Attack Options")
 Toggle(CombatPage,"Killaura",false,function(v) Settings.Killaura=v end)
 Slider(CombatPage,"Aura Range",5,30,18,function(v) Settings.AuraRange=v end)
-Toggle(CombatPage,"Anti-Knockback (Velocity)",false,function(v) Settings.Velocity=v end)
+Toggle(CombatPage,"Reach (Long Arm)",false,function(v) Settings.Reach=v end)
+Slider(CombatPage,"Reach Distance",10,30,18,function(v) Settings.ReachVal=v end)
+Toggle(CombatPage,"Anti-Knockback",false,function(v) Settings.Velocity=v end)
 
 Section(VisPage,"ESP Features")
 Toggle(VisPage,"Player ESP",false,function(v) Settings.PlayerESP=v end)
 Toggle(VisPage,"Bed ESP",false,function(v) Settings.BedESP=v if not v then UpdateBedESP() end end)
+Toggle(VisPage,"Fullbright",false,function(v) Settings.Fullbright=v SetFullbright(v) end)
 
 Section(MovePage,"Character")
-Toggle(MovePage,"Speed Hack (Risky)",false,function(v) Settings.Speed=v end)
+Toggle(MovePage,"Speed Hack",false,function(v) Settings.Speed=v end)
 Slider(MovePage,"Speed Value",16,100,20,function(v) Settings.SpeedVal=v end)
 Toggle(MovePage,"Infinite Jump",false,function(v) Settings.InfJump=v end)
 Toggle(MovePage,"Noclip",false,function(v) Settings.Noclip=v end)
-Toggle(MovePage,"Fly (Risky)",false,function(v) Settings.Fly=v if v then StartFly() else StopFly() end end)
+Toggle(MovePage,"Anti-Void",false,function(v) Settings.AntiVoid=v end)
+Toggle(MovePage,"Fly",false,function(v) Settings.Fly=v if v then StartFly() else StopFly() end end)
 Slider(MovePage,"Fly Speed",10,100,25,function(v) Settings.FlySpeed=v end)
 
 do local dr,ds,sp

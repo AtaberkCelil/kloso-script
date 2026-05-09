@@ -9,6 +9,7 @@ local WS = cloneref(game:GetService("Workspace"))
 local CoreGui = cloneref(game:GetService("CoreGui"))
 local HttpService = cloneref(game:GetService("HttpService"))
 local StarterGui = cloneref(game:GetService("StarterGui"))
+local Lighting = cloneref(game:GetService("Lighting"))
 
 local LP = Players.LocalPlayer
 local Camera = WS.CurrentCamera
@@ -17,11 +18,37 @@ local Connections = {}
 local Theme = {Accent=Color3.fromRGB(0,255,100),Bg=Color3.fromRGB(10,14,10),Card=Color3.fromRGB(18,24,18),Border=Color3.fromRGB(30,60,30),Text=Color3.fromRGB(240,250,240),Sub=Color3.fromRGB(160,180,160)}
 
 local Settings = {
-    AutoStomp = false, AutoBlock = false,
-    PlayerESP = false, CashESP = false,
+    AutoStomp = false, AutoBlock = false, AimLock = false,
+    Hitbox = false, HitboxSize = 10, TargetStrafe = false, StrafeSpeed = 5,
+    PlayerESP = false, CashESP = false, CashAura = false, Fullbright = false,
     Speed = false, SpeedVal = 50,
     Noclip = false, InfJump = false, Fly = false, FlySpeed = 100
 }
+
+-- Config System
+local ConfigName = "KlosoHub_DaHood.json"
+local function SaveConfig()
+    pcall(function()
+        if not isfolder("KlosoHub") then makefolder("KlosoHub") end
+        writefile("KlosoHub/"..ConfigName, HttpService:JSONEncode(Settings))
+        StarterGui:SetCore("SendNotification",{Title="KLOSO",Text="Config Saved!",Duration=2})
+    end)
+end
+local function LoadConfig()
+    pcall(function()
+        if isfile("KlosoHub/"..ConfigName) then
+            local d = HttpService:JSONDecode(readfile("KlosoHub/"..ConfigName))
+            for k,v in pairs(d) do Settings[k]=v end
+            StarterGui:SetCore("SendNotification",{Title="KLOSO",Text="Config Loaded!",Duration=2})
+        end
+    end)
+end
+
+-- Fullbright
+local function SetFullbright(on)
+    if on then Lighting.Brightness=2 Lighting.ClockTime=14 Lighting.FogEnd=100000 Lighting.GlobalShadows=false
+    else Lighting.Brightness=1 Lighting.GlobalShadows=true end
+end
 
 local function Create(cl,p) local i=Instance.new(cl) for k,v in pairs(p) do if k~="Parent" then pcall(function() i[k]=v end) end end if p.Parent then i.Parent=p.Parent end return i end
 local function Tw(o,g) TweenService:Create(o, TweenInfo.new(0.25, Enum.EasingStyle.Quart), g):Play() end
@@ -64,6 +91,75 @@ task.spawn(function()
             local combat = LP.Character:FindFirstChild("Combat")
             if combat and combat:FindFirstChild("RemoteEvent") then
                 if near then combat.RemoteEvent:FireServer("Block", true) else combat.RemoteEvent:FireServer("Block", false) end
+            end
+        end
+    end
+end)
+
+-- Aim Lock
+local lockTarget = nil
+task.spawn(function()
+    while task.wait() do
+        if Settings.AimLock and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            if not lockTarget or not lockTarget.Character or not lockTarget.Character:FindFirstChild("HumanoidRootPart") or not lockTarget.Character:FindFirstChild("Humanoid") or lockTarget.Character.Humanoid.Health <= 0 then
+                local best,dist = nil,math.huge
+                for _,p in pairs(Players:GetPlayers()) do
+                    if p~=LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health>0 then
+                        local d=(LP.Character.HumanoidRootPart.Position-p.Character.HumanoidRootPart.Position).Magnitude
+                        if d<dist then best=p dist=d end
+                    end
+                end
+                lockTarget = best
+            end
+            if lockTarget and lockTarget.Character and lockTarget.Character:FindFirstChild("HumanoidRootPart") then
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, lockTarget.Character.HumanoidRootPart.Position)
+            end
+        end
+    end
+end)
+
+-- Target Strafe
+local strafeAngle = 0
+task.spawn(function()
+    while task.wait() do
+        if Settings.TargetStrafe and lockTarget and lockTarget.Character and lockTarget.Character:FindFirstChild("HumanoidRootPart") and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            strafeAngle = strafeAngle + Settings.StrafeSpeed
+            local rad = math.rad(strafeAngle)
+            local tPos = lockTarget.Character.HumanoidRootPart.Position
+            local offset = Vector3.new(math.cos(rad)*8, 0, math.sin(rad)*8)
+            LP.Character.HumanoidRootPart.CFrame = CFrame.new(tPos+offset, tPos)
+        end
+    end
+end)
+
+-- Hitbox Expander
+task.spawn(function()
+    while task.wait(0.1) do
+        if Settings.Hitbox then
+            for _,p in pairs(Players:GetPlayers()) do
+                if p~=LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    p.Character.HumanoidRootPart.Size=Vector3.new(Settings.HitboxSize,Settings.HitboxSize,Settings.HitboxSize)
+                    p.Character.HumanoidRootPart.Transparency=0.8
+                    p.Character.HumanoidRootPart.CanCollide=false
+                end
+            end
+        end
+    end
+end)
+
+-- Cash Aura
+task.spawn(function()
+    while task.wait(0.5) do
+        if Settings.CashAura and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = LP.Character.HumanoidRootPart
+            local drops = WS:FindFirstChild("Ignored") and WS.Ignored:FindFirstChild("Drop") or WS
+            for _,obj in pairs(drops:GetChildren()) do
+                if obj.Name=="MoneyDrop" and obj:FindFirstChild("Handle") then
+                    if (obj.Handle.Position-hrp.Position).Magnitude < 50 then
+                        obj.Handle.CFrame = hrp.CFrame
+                        if firetouchinterest then firetouchinterest(hrp,obj.Handle,0) firetouchinterest(hrp,obj.Handle,1) end
+                    end
+                end
             end
         end
     end
@@ -175,7 +271,8 @@ Create("UICorner",{Parent=ClsBtn,CornerRadius=UDim.new(0,6)}) ClsBtn.MouseButton
 
 local TabContainer=Create("Frame",{Parent=Main,Size=UDim2.new(1,-130,1,-20),Position=UDim2.new(0,130,0,10),BackgroundTransparency=1})
 local Tabs={}
-local function CreateTab(name) local btn=Create("TextButton",{Parent=Sidebar,Size=UDim2.new(1,-10,0,35),Position=UDim2.new(0,5,0,60+(#Tabs*40)),BackgroundColor3=Theme.Bg,Text=name,TextColor3=Theme.Sub,TextSize=12,Font=Enum.Font.GothamSemibold}) Create("UICorner",{Parent=btn,CornerRadius=UDim.new(0,6)}) local page=Create("ScrollingFrame",{Parent=TabContainer,Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,Visible=(#Tabs==0),ScrollBarThickness=0,CanvasSize=UDim2.new(0,0,3,0)}) Create("UIListLayout",{Parent=page,Padding=UDim.new(0,5)}) btn.MouseButton1Click:Connect(function() for _,t in pairs(Tabs) do t.Page.Visible=false Tw(t.Btn,{TextColor3=Theme.Sub}) end page.Visible=true Tw(btn,{TextColor3=Theme.Accent}) end) if #Tabs==0 then btn.TextColor3=Theme.Accent end table.insert(Tabs,{Btn=btn,Page=page}) return page end
+local function CreateTab(name) local btn=Create("TextButton",{Parent=Sidebar,Size=UDim2.new(1,-10,0,35),Position=UDim2.new(0,5,0,60+(#Tabs*40)),BackgroundColor3=Theme.Bg,Text=name,TextColor3=Theme.Sub,TextSize=12,Font=Enum.Font.GothamSemibold}) Create("UICorner",{Parent=btn,CornerRadius=UDim.new(0,6)}) local page=Create("ScrollingFrame",{Parent=TabContainer,Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,Visible=(#Tabs==0),ScrollBarThickness=0,CanvasSize=UDim2.new(0,0,5,0)}) Create("UIListLayout",{Parent=page,Padding=UDim.new(0,5)}) btn.MouseButton1Click:Connect(function() for _,t in pairs(Tabs) do t.Page.Visible=false Tw(t.Btn,{TextColor3=Theme.Sub}) end page.Visible=true Tw(btn,{TextColor3=Theme.Accent}) end) if #Tabs==0 then btn.TextColor3=Theme.Accent end table.insert(Tabs,{Btn=btn,Page=page}) return page end
+local function Button(p,t,cb) local r=Create("Frame",{Parent=p,Size=UDim2.new(1,-5,0,35),BackgroundColor3=Theme.Card,BorderSizePixel=0}) Create("UICorner",{Parent=r,CornerRadius=UDim.new(0,6)}) local b=Create("TextButton",{Parent=r,Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text=t,TextColor3=Theme.Text,TextSize=12,Font=Enum.Font.GothamBold}) b.MouseButton1Click:Connect(cb) end
 
 local function Section(p,t) Create("TextLabel",{Parent=p,Size=UDim2.new(1,0,0,25),BackgroundTransparency=1,Text=t,TextColor3=Theme.Accent,TextSize=11,Font=Enum.Font.GothamBold,TextXAlignment=Enum.TextXAlignment.Left}) end
 local function Toggle(p,name,def,cb)
@@ -202,14 +299,24 @@ end
 local CombatPage=CreateTab("Combat")
 local VisPage=CreateTab("Visuals")
 local MovePage=CreateTab("Movement")
+local ConfigPage=CreateTab("Config")
+
+Section(CombatPage,"Aim & Lock")
+Toggle(CombatPage,"Aim Lock (Nearest)",false,function(v) Settings.AimLock=v if not v then lockTarget=nil end end)
+Toggle(CombatPage,"Target Strafe",false,function(v) Settings.TargetStrafe=v end)
+Slider(CombatPage,"Strafe Speed",1,15,5,function(v) Settings.StrafeSpeed=v end)
 
 Section(CombatPage,"Combat Mods")
 Toggle(CombatPage,"Auto Stomp",false,function(v) Settings.AutoStomp=v end)
 Toggle(CombatPage,"Auto Block (Proximity)",false,function(v) Settings.AutoBlock=v end)
+Toggle(CombatPage,"Hitbox Expander",false,function(v) Settings.Hitbox=v end)
+Slider(CombatPage,"Hitbox Size",5,30,10,function(v) Settings.HitboxSize=v end)
 
 Section(VisPage,"World ESP")
 Toggle(VisPage,"Player ESP",false,function(v) Settings.PlayerESP=v end)
 Toggle(VisPage,"Cash Drop ESP",false,function(v) Settings.CashESP=v if not v then UpdateCashESP() end end)
+Toggle(VisPage,"Cash Aura (Auto Collect)",false,function(v) Settings.CashAura=v end)
+Toggle(VisPage,"Fullbright",false,function(v) Settings.Fullbright=v SetFullbright(v) end)
 
 Section(MovePage,"Character")
 Toggle(MovePage,"Speed Hack",false,function(v) Settings.Speed=v end)
@@ -218,6 +325,10 @@ Toggle(MovePage,"Infinite Jump",false,function(v) Settings.InfJump=v end)
 Toggle(MovePage,"Noclip",false,function(v) Settings.Noclip=v end)
 Toggle(MovePage,"Fly",false,function(v) Settings.Fly=v if v then StartFly() else StopFly() end end)
 Slider(MovePage,"Fly Speed",10,200,50,function(v) Settings.FlySpeed=v end)
+
+Section(ConfigPage,"Save & Load")
+Button(ConfigPage,"Save Config",SaveConfig)
+Button(ConfigPage,"Load Config",LoadConfig)
 
 do local dr,ds,sp
     Connections.D1=Sidebar.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then dr=true ds=i.Position sp=Main.Position end end)
