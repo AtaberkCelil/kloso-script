@@ -44,9 +44,12 @@ local SupportedGames = {
     [17625359962] = {Name = "Rivals", File = "kloso-rivals.lua"},
     [286090429]   = {Name = "Arsenal", File = "arsenal.lua"},
     [10449761463] = {Name = "The Strongest Battlegrounds", File = "tsb.lua"},
-    [189707]      = {Name = "Natural Disaster Survival", File = "nds.lua"}
+    [189707]      = {Name = "Natural Disaster Survival", File = "nds.lua"},
+    [2753915549]  = {Name = "Blox Fruits", File = "bloxfruits.lua"},
+    [142823291]   = {Name = "Murder Mystery 2", File = "mm2.lua"}
 }
 
+local BASE_URL = "https://raw.githubusercontent.com/AtaberkCelil/kloso-script/main/"
 local gameData = SupportedGames[placeId]
 
 if gameData then
@@ -54,19 +57,25 @@ if gameData then
     task.wait(1)
     LoaderUI:Destroy()
     
-    -- Fetch script directly from GitHub repository
     local success, err = pcall(function()
-        local url = "https://raw.githubusercontent.com/AtaberkCelil/kloso-script/main/" .. gameData.File
-        loadstring(game:HttpGet(url))()
+        loadstring(game:HttpGet(BASE_URL .. gameData.File))()
     end)
     
     if not success then
-        warn("[KLOSO HUB] Failed to load script: " .. tostring(err))
+        warn("[KLOSO HUB] Failed to load game script: " .. tostring(err))
+        warn("[KLOSO HUB] Falling back to Universal...")
+        pcall(function() loadstring(game:HttpGet(BASE_URL .. "universal.lua"))() end)
     end
 else
-    Status.Text = "Game Not Supported. Loading Universal..."
-    Status.TextColor3 = Color3.fromRGB(255, 100, 100)
-    task.wait(2)
+    Status.Text = "Loading Universal Hub..."
+    Status.TextColor3 = Color3.fromRGB(0, 180, 255)
+    task.wait(1)
     LoaderUI:Destroy()
-    -- Insert generic universal script here if needed
+    
+    local success, err = pcall(function()
+        loadstring(game:HttpGet(BASE_URL .. "universal.lua"))()
+    end)
+    if not success then
+        warn("[KLOSO HUB] Failed to load universal: " .. tostring(err))
+    end
 end
