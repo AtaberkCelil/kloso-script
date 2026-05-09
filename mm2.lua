@@ -113,22 +113,52 @@ end
 task.spawn(function() while task.wait(5) do if Settings.CoinESP then UpdateCoinESP() end end end)
 
 -- Auto Coin
+local touchedCoins = {}
 task.spawn(function()
     while task.wait(0.1) do
         if Settings.AutoCoin and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
             local hrp = LP.Character.HumanoidRootPart
+            local coinsToCollect = {}
+            
             local normal = WS:FindFirstChild("Normal")
             if normal and normal:FindFirstChild("CoinContainer") then
                 for _, c in pairs(normal.CoinContainer:GetDescendants()) do
                     if (c.Name == "Coin" or c.Name == "Snowflake" or c.Name == "Gem") and c:IsA("BasePart") and c.Transparency < 1 then
-                        hrp.CFrame = c.CFrame
-                        -- Fire touch manually
-                        if firetouchinterest then
-                            firetouchinterest(hrp, c, 0)
-                            firetouchinterest(hrp, c, 1)
-                        end
-                        task.wait(0.15)
+                        table.insert(coinsToCollect, c)
                     end
+                end
+            end
+            
+            -- Fallback if CoinContainer is empty or missing
+            if #coinsToCollect == 0 then
+                for _, obj in pairs(WS:GetChildren()) do
+                    if obj.Name == "Coin_Server" or obj.Name:lower():find("coin") then
+                        if obj:IsA("BasePart") then table.insert(coinsToCollect, obj) end
+                        for _, c in pairs(obj:GetDescendants()) do
+                            if (c.Name == "Coin" or c.Name == "Snowflake" or c.Name == "Gem") and c:IsA("BasePart") and c.Transparency < 1 then
+                                table.insert(coinsToCollect, c)
+                            end
+                        end
+                    end
+                end
+            end
+            
+            for _, c in pairs(coinsToCollect) do
+                if Settings.AutoCoin and c and c.Parent and c.Transparency < 1 and not touchedCoins[c] then
+                    hrp.CFrame = c.CFrame
+                    if firetouchinterest then
+                        firetouchinterest(hrp, c, 0)
+                        firetouchinterest(hrp, c, 1)
+                    end
+                    touchedCoins[c] = true
+                    task.wait(0.2)
+                end
+            end
+            
+            -- Memory Cleanup
+            if math.random(1, 20) == 1 then
+                for k, _ in pairs(touchedCoins) do
+                    if not k or not k.Parent then touchedCoins[k] = nil end
                 end
             end
         end
