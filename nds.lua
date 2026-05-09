@@ -37,7 +37,8 @@ local Settings = {
         Jump = false,
         JumpVal = 50,
         Noclip = false,
-        InfJump = false
+        InfJump = false,
+        Fling = false
 	},
 	Menu = {
 		ToggleKey = Enum.KeyCode.RightShift
@@ -189,6 +190,25 @@ task.spawn(function()
     end
 end)
 
+local FlingVel = nil
+Connections.FlingLoop = RS.Stepped:Connect(function()
+    if Settings.Movement.Fling and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LP.Character.HumanoidRootPart
+        if not FlingVel then
+            FlingVel = Instance.new("BodyAngularVelocity")
+            FlingVel.AngularVelocity = Vector3.new(99999, 99999, 99999)
+            FlingVel.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+            FlingVel.P = 100000
+            FlingVel.Parent = hrp
+        else
+            FlingVel.Parent = hrp
+        end
+        -- Keep character upright somewhat if needed, or just let them spin
+    else
+        if FlingVel then FlingVel:Destroy() FlingVel = nil end
+    end
+end)
+
 
 -- [[ UI SYSTEM ]]
 local oldGui = (gethui or function() return CoreGui end)():FindFirstChild("KlosoNDS")
@@ -284,6 +304,12 @@ Toggle(PlayerPage, "JumpPower Hack", false, function(v) Settings.Movement.Jump =
 Slider(PlayerPage, "Jump Value", 50, 300, 80, function(v) Settings.Movement.JumpVal = v end)
 Toggle(PlayerPage, "Infinite Jump", false, function(v) Settings.Movement.InfJump = v end)
 Toggle(PlayerPage, "Noclip", false, function(v) Settings.Movement.Noclip = v end)
+
+Section(PlayerPage, "Admin Tools")
+Toggle(PlayerPage, "Enable Fling (Spin)", false, function(v) Settings.Movement.Fling = v end)
+Button(PlayerPage, "Load Infinite Yield", function()
+    loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+end)
 
 -- Config
 Section(ConfigPage, "Configuration System")
