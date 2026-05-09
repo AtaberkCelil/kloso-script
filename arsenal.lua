@@ -193,25 +193,36 @@ if hookmetamethod and getnamecallmethod and checkcaller then
 end
 
 -- TriggerBot & Auto Kill logic
-local function GetAnyTarget()
+local function GetClosest3DTarget()
+	local closest, shortest = nil, math.huge
+	if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return nil end
+	local lpPos = LP.Character.HumanoidRootPart.Position
+	
 	for _, p in Players:GetPlayers() do
 		if p ~= LP and p.Character then
 			local char = p.Character
 			local targetPart = char:FindFirstChild(Settings.Combat.TargetPart) or char:FindFirstChild("Head")
 			if not targetPart then continue end
 			local hum = char:FindFirstChild("Humanoid")
-			if hum and hum.Health <= 0 then continue end
+			if not hum or hum.Health <= 0 then continue end
+			-- Skip spawn protected or menu players
+			if char:FindFirstChildOfClass("ForceField") then continue end
 			if Settings.Combat.TeamCheck and IsTeammate(p) then continue end
-			return p
+			
+			local dist = (targetPart.Position - lpPos).Magnitude
+			if dist < shortest then
+				shortest = dist
+				closest = p
+			end
 		end
 	end
-	return nil
+	return closest
 end
 
 local lastTrigger = 0
 RS.RenderStepped:Connect(function()
     if Settings.Combat.AutoKill then
-        local target = GetAnyTarget()
+        local target = GetClosest3DTarget()
         if target and target.Character and target.Character:FindFirstChild(Settings.Combat.TargetPart) and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
             local targetPart = target.Character[Settings.Combat.TargetPart]
             -- Teleport behind and above
