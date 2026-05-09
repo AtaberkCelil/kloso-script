@@ -17,7 +17,7 @@ local Connections = {}
 local Theme = {Accent=Color3.fromRGB(255,100,50),Bg=Color3.fromRGB(14,10,10),Card=Color3.fromRGB(24,18,18),Border=Color3.fromRGB(60,30,30),Text=Color3.fromRGB(250,240,235),Sub=Color3.fromRGB(180,160,155)}
 
 local Settings = {
-    AutoFarm = false, AutoQuest = false,
+    AutoFarm = false, AutoQuest = false, BringMobs = false,
     FruitESP = false, PlayerESP = false,
     Speed = false, SpeedVal = 100,
     Noclip = false, InfJump = false, Fly = false, FlySpeed = 100,
@@ -112,11 +112,31 @@ task.spawn(function()
                 -- Auto Click
                 if tick() - lastFarmTick > 0.1 then
                     if mouse1click then mouse1click() end
-                    -- Try firing virtual user as fallback
                     local vu = game:GetService("VirtualUser")
                     vu:CaptureController()
                     vu:ClickButton1(Vector2.new())
                     lastFarmTick = tick()
+                end
+            end
+        end
+        
+        if Settings.BringMobs and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            local myPos = LP.Character.HumanoidRootPart.Position
+            if WS:FindFirstChild("Enemies") then
+                for _, v in pairs(WS.Enemies:GetChildren()) do
+                    if v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
+                        local d = (v.HumanoidRootPart.Position - myPos).Magnitude
+                        if d < 300 then -- Bring mobs within 300 studs
+                            v.HumanoidRootPart.CFrame = LP.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -4)
+                            v.HumanoidRootPart.CanCollide = false
+                            if v.HumanoidRootPart:FindFirstChild("BodyVelocity") == nil then
+                                local bv = Instance.new("BodyVelocity")
+                                bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                                bv.Velocity = Vector3.new(0, 0, 0)
+                                bv.Parent = v.HumanoidRootPart
+                            end
+                        end
+                    end
                 end
             end
         end
@@ -221,6 +241,7 @@ local MovePage=CreateTab("Movement")
 
 Section(FarmPage,"Automation")
 Toggle(FarmPage,"Mob Auto Farm",false,function(v) Settings.AutoFarm=v end)
+Toggle(FarmPage,"Bring Mobs (Magnet)",false,function(v) Settings.BringMobs=v end)
 Toggle(FarmPage,"Fruit ESP",false,function(v) Settings.FruitESP=v if not v then UpdateFruitESP() end end)
 Toggle(FarmPage,"Auto Haki",false,function(v) Settings.AutoHaki=v end)
 Button(FarmPage,"Teleport to Nearest Fruit",function()
