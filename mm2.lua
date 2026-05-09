@@ -16,6 +16,7 @@ local Theme = {Accent=Color3.fromRGB(200,50,80),Bg=Color3.fromRGB(14,10,12),Card
 local Settings = {
     MurdererESP = true, SheriffESP = true,
     PlayerESP = false, CoinESP = false,
+    AutoCoin = false, FlingMurderer = false,
     Speed = false, SpeedVal = 25,
     Noclip = false, InfJump = false, Fly = false, FlySpeed = 50
 }
@@ -97,6 +98,57 @@ local function UpdateCoinESP()
 end
 task.spawn(function() while task.wait(5) do if Settings.CoinESP then UpdateCoinESP() end end end)
 
+-- Auto Coin
+task.spawn(function()
+    while task.wait(0.2) do
+        if Settings.AutoCoin and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            for _,obj in pairs(WS:GetDescendants()) do
+                if (obj.Name:lower():find("coin") or obj.Name:lower():find("gem")) and obj:IsA("BasePart") and obj.Transparency < 1 then
+                    LP.Character.HumanoidRootPart.CFrame = obj.CFrame
+                    task.wait(0.15)
+                end
+            end
+        end
+    end
+end)
+
+-- Fling Murderer
+local FlingVel
+task.spawn(function()
+    while task.wait(0.05) do
+        if Settings.FlingMurderer and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            local murderer = nil
+            for _,p in pairs(Players:GetPlayers()) do
+                if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                    if GetRole(p) == "Murderer" then
+                        murderer = p
+                        break
+                    end
+                end
+            end
+            
+            if murderer then
+                local hrp = LP.Character.HumanoidRootPart
+                if not FlingVel then
+                    FlingVel = Instance.new("BodyAngularVelocity") 
+                    FlingVel.AngularVelocity = Vector3.new(99999,99999,99999) 
+                    FlingVel.MaxTorque = Vector3.new(math.huge,math.huge,math.huge) 
+                    FlingVel.P = 100000 
+                    FlingVel.Parent = hrp
+                else
+                    FlingVel.Parent = hrp
+                end
+                -- Teleport into them to fling
+                hrp.CFrame = murderer.Character.HumanoidRootPart.CFrame
+            else
+                if FlingVel then FlingVel:Destroy() FlingVel = nil end
+            end
+        else
+            if FlingVel then FlingVel:Destroy() FlingVel = nil end
+        end
+    end
+end)
+
 -- Fly
 local flyBV,flyBG,flying=nil,nil,false
 local function StartFly()
@@ -175,9 +227,14 @@ local function Slider(p,name,min,max,def,cb)
     Connections["Slider_"..name]=UIS.InputChanged:Connect(function(i) if drag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then update(i) end end)
 end
 
+local FarmPage=CreateTab("Auto Farm")
 local RolePage=CreateTab("Roles")
 local VisPage=CreateTab("Visuals")
 local MovePage=CreateTab("Movement")
+
+Section(FarmPage,"Automation")
+Toggle(FarmPage,"Auto Collect Coins",false,function(v) Settings.AutoCoin=v end)
+Toggle(FarmPage,"Fling Murderer (Auto Kill)",false,function(v) Settings.FlingMurderer=v end)
 
 Section(RolePage,"Role Detection ESP")
 Toggle(RolePage,"Murderer ESP (Red)",true,function(v) Settings.MurdererESP=v end)
