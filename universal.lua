@@ -30,7 +30,8 @@ local Settings = {
     Noclip = false, InfJump = false, Bhop = false,
     Fly = false, FlySpeed = 50,
     AntiAFK = true, Fullbright = false,
-    Fling = false, GodMode = false,
+    Fling = false, FlingAll = false, FlingRange = 20, FlingTarget = nil,
+    GodMode = false,
     AutoCollect = false, CollectRange = 50,
     Waypoints = {}
 }
@@ -148,6 +149,38 @@ task.spawn(function()
     end
 end)
 
+-- Fling Logic (Integrated)
+local function GetHRP(char) return char and char:FindFirstChild("HumanoidRootPart") end
+local function FlingPlayer(target)
+    if not LP.Character or not GetHRP(LP.Character) then return end
+    local tHRP = GetHRP(target.Character)
+    if tHRP then
+        local myHRP = GetHRP(LP.Character)
+        for _, v in pairs(LP.Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = false end end
+        myHRP.RotVelocity = Vector3.new(0, 10000, 0)
+        myHRP.CFrame = tHRP.CFrame * CFrame.new(math.random(-1,1), 0, math.random(-1,1))
+        task.wait(0.05)
+        myHRP.Velocity = Vector3.new(0, 10000, 0)
+    end
+end
+
+task.spawn(function()
+    while task.wait() do
+        if Settings.Fling then
+            if Settings.FlingTarget and Settings.FlingTarget.Parent then
+                FlingPlayer(Settings.FlingTarget)
+            elseif Settings.FlingAll then
+                for _, p in pairs(Players:GetPlayers()) do
+                    if p ~= LP and p.Character and GetHRP(p.Character) then
+                        local dist = (GetHRP(LP.Character).Position - GetHRP(p.Character).Position).Magnitude
+                        if dist < Settings.FlingRange then FlingPlayer(p) end
+                    end
+                end
+            end
+        end
+    end
+end)
+
 -- ESP
 local ESP_Objects = {}
 local function GetESPObj(p)
@@ -256,6 +289,7 @@ local function Button(p,t,cb) local r=Create("Frame",{Parent=p,Size=UDim2.new(1,
 
 local VisPage=CreateTab("Visuals")
 local MovePage=CreateTab("Movement")
+local FlingPage=CreateTab("Fling")
 local WorldPage=CreateTab("World")
 local ToolsPage=CreateTab("Tools")
 
@@ -276,6 +310,23 @@ Toggle(MovePage,"Bunny Hop",false,function(v) Settings.Bhop=v end)
 Toggle(MovePage,"Noclip",false,function(v) Settings.Noclip=v end)
 Toggle(MovePage,"Fly",false,function(v) Settings.Fly=v if v then StartFly() else StopFly() end end)
 Slider(MovePage,"Fly Speed",10,200,50,function(v) Settings.FlySpeed=v end)
+
+Section(FlingPage,"Fling Options")
+Toggle(FlingPage,"Enable Fling Mode",false,function(v) Settings.Fling = v end)
+Toggle(FlingPage,"Fling All Nearby",false,function(v) Settings.FlingAll = v end)
+Slider(FlingPage,"Fling Range",5,100,20,function(v) Settings.FlingRange = v end)
+
+Section(FlingPage,"Targeting")
+Button(FlingPage,"Fling Nearest Player",function()
+    local best,dist = nil,math.huge
+    for _,p in pairs(Players:GetPlayers()) do
+        if p~=LP and p.Character and GetHRP(p.Character) then
+            local d=(GetHRP(LP.Character).Position-GetHRP(p.Character).Position).Magnitude
+            if d<dist then best=p dist=d end
+        end
+    end
+    if best then FlingPlayer(best) end
+end)
 
 Section(ToolsPage,"Utilities")
 Toggle(ToolsPage,"Anti-AFK",true,function(v) Settings.AntiAFK=v end)
