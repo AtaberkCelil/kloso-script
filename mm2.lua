@@ -89,10 +89,24 @@ local coinHighlights = {}
 local function UpdateCoinESP()
     for _,v in pairs(coinHighlights) do if v and v.Parent then v:Destroy() end end coinHighlights={}
     if not Settings.CoinESP then return end
-    for _,obj in pairs(WS:GetDescendants()) do
-        if (obj.Name:lower():find("coin") or obj.Name:lower():find("gem")) and obj:IsA("BasePart") then
+    
+    local function highlight(obj)
+        if obj:IsA("BasePart") then
             local h=Instance.new("Highlight") h.FillColor=Color3.fromRGB(255,215,0) h.OutlineColor=Color3.fromRGB(255,255,100) h.FillTransparency=0.5 h.Adornee=obj h.Parent=obj
             table.insert(coinHighlights,h)
+        end
+    end
+
+    local normal = WS:FindFirstChild("Normal")
+    if normal and normal:FindFirstChild("CoinContainer") then
+        for _, c in pairs(normal.CoinContainer:GetDescendants()) do
+            if c.Name == "Coin" or c.Name == "Snowflake" or c.Name == "Gem" then highlight(c) end
+        end
+    else
+        for _,obj in pairs(WS:GetDescendants()) do
+            if (obj.Name:lower():find("coin") or obj.Name:lower():find("gem") or obj.Name:lower():find("snowflake")) and obj:IsA("BasePart") then
+                highlight(obj)
+            end
         end
     end
 end
@@ -100,12 +114,21 @@ task.spawn(function() while task.wait(5) do if Settings.CoinESP then UpdateCoinE
 
 -- Auto Coin
 task.spawn(function()
-    while task.wait(0.2) do
+    while task.wait(0.1) do
         if Settings.AutoCoin and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
-            for _,obj in pairs(WS:GetDescendants()) do
-                if (obj.Name:lower():find("coin") or obj.Name:lower():find("gem")) and obj:IsA("BasePart") and obj.Transparency < 1 then
-                    LP.Character.HumanoidRootPart.CFrame = obj.CFrame
-                    task.wait(0.15)
+            local hrp = LP.Character.HumanoidRootPart
+            local normal = WS:FindFirstChild("Normal")
+            if normal and normal:FindFirstChild("CoinContainer") then
+                for _, c in pairs(normal.CoinContainer:GetDescendants()) do
+                    if (c.Name == "Coin" or c.Name == "Snowflake" or c.Name == "Gem") and c:IsA("BasePart") and c.Transparency < 1 then
+                        hrp.CFrame = c.CFrame
+                        -- Fire touch manually
+                        if firetouchinterest then
+                            firetouchinterest(hrp, c, 0)
+                            firetouchinterest(hrp, c, 1)
+                        end
+                        task.wait(0.15)
+                    end
                 end
             end
         end
