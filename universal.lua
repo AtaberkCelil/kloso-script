@@ -235,6 +235,7 @@ Toggle(ToolsPage,"Anti-AFK",true,function(v) Settings.AntiAFK=v end)
 Toggle(ToolsPage,"Fullbright",false,function(v) Settings.Fullbright=v SetFullbright(v) end)
 Toggle(ToolsPage,"Fling",false,function(v) Settings.Fling=v end)
 Button(ToolsPage,"Load Infinite Yield",function() loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))() end)
+Button(ToolsPage,"Load KILASIK Multi-Fling",function() loadstring(game:HttpGet('https://raw.githubusercontent.com/AtaberkCelil/kloso-script/main/fling.lua'))() end)
 Button(ToolsPage,"Rejoin Server",function() TweenService:Create(game:GetService("TeleportService"),TweenInfo.new(0),{}):Cancel() game:GetService("TeleportService"):Teleport(game.PlaceId,LP) end)
 
 do local dr,ds,sp
