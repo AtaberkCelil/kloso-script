@@ -30,7 +30,9 @@ local Settings = {
     Noclip = false, InfJump = false, Bhop = false,
     Fly = false, FlySpeed = 50,
     AntiAFK = true, Fullbright = false,
-    Fling = false, GodMode = false
+    Fling = false, GodMode = false,
+    AutoCollect = false, CollectRange = 50,
+    Waypoints = {}
 }
 
 local ConfigName = "KlosoHub_Universal.json"
@@ -120,6 +122,31 @@ task.spawn(function() while task.wait(0.5) do if LP.Character and LP.Character:F
     if Settings.Jump then LP.Character.Humanoid.JumpPower = Settings.JumpVal LP.Character.Humanoid.UseJumpPower = true end
     if Settings.GodMode then LP.Character.Humanoid.Health = LP.Character.Humanoid.MaxHealth end
 end end end)
+
+-- Universal Coin/Gem Collector
+task.spawn(function()
+    while task.wait(0.5) do
+        if Settings.AutoCollect and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = LP.Character.HumanoidRootPart
+            for _,v in pairs(WS:GetDescendants()) do
+                if v:IsA("BasePart") or v:IsA("MeshPart") then
+                    local name = v.Name:lower()
+                    if name:find("coin") or name:find("gem") or name:find("diamond") or name:find("gold") or name:find("money") or name:find("heart") then
+                        local dist = (v.Position - hrp.Position).Magnitude
+                        if dist < Settings.CollectRange then
+                            if firetouchinterest then
+                                firetouchinterest(hrp, v, 0)
+                                firetouchinterest(hrp, v, 1)
+                            else
+                                v.CFrame = hrp.CFrame
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
 
 -- ESP
 local ESP_Objects = {}
@@ -225,9 +252,11 @@ local function Slider(p,name,min,max,def,cb)
     btn.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end end)
     Connections["Slider_"..name]=UIS.InputChanged:Connect(function(i) if drag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then update(i) end end)
 end
+local function Button(p,t,cb) local r=Create("Frame",{Parent=p,Size=UDim2.new(1,-5,0,35),BackgroundColor3=Theme.Card,BorderSizePixel=0}) Create("UICorner",{Parent=r,CornerRadius=UDim.new(0,6)}) local b=Create("TextButton",{Parent=r,Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text=t,TextColor3=Theme.Text,TextSize=12,Font=Enum.Font.GothamBold}) b.MouseButton1Click:Connect(cb) end
 
 local VisPage=CreateTab("Visuals")
 local MovePage=CreateTab("Movement")
+local WorldPage=CreateTab("World")
 local ToolsPage=CreateTab("Tools")
 
 Section(VisPage,"ESP Settings")
@@ -280,6 +309,70 @@ Button(ToolsPage,"TP to Nearest Player",function()
     end
     if best then LP.Character.HumanoidRootPart.CFrame=best.Character.HumanoidRootPart.CFrame*CFrame.new(0,0,3) end
 end)
+
+Section(WorldPage,"Teleport Menu (Waypoints)")
+local WaypointList = Create("Frame",{Parent=WorldPage,Size=UDim2.new(1,0,0,150),BackgroundTransparency=1})
+Create("UIListLayout",{Parent=WaypointList,Padding=UDim.new(0,5)})
+
+local function RefreshWaypoints()
+    for _,v in pairs(WaypointList:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
+    for name,cf in pairs(Settings.Waypoints) do
+        local r = Create("Frame",{Parent=WaypointList,Size=UDim2.new(1,-5,0,30),BackgroundColor3=Theme.Card})
+        Create("UICorner",{Parent=r,CornerRadius=UDim.new(0,6)})
+        Create("TextLabel",{Parent=r,Size=UDim2.new(0.6,0,1,0),Position=UDim2.new(0,5,0,0),BackgroundTransparency=1,Text=name,TextColor3=Theme.Text,TextSize=11,Font=Enum.Font.Gotham,TextXAlignment=Enum.TextXAlignment.Left})
+        local b = Create("TextButton",{Parent=r,Size=UDim2.new(0.35,0,0.8,0),Position=UDim2.new(0.6,0,0.1,0),BackgroundColor3=Theme.Bg,Text="TP",TextColor3=Theme.Accent,TextSize=10,Font=Enum.Font.GothamBold})
+        Create("UICorner",{Parent=b,CornerRadius=UDim.new(0,4)})
+        b.MouseButton1Click:Connect(function() if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then LP.Character.HumanoidRootPart.CFrame = CFrame.new(unpack(cf)) end end)
+    end
+end
+
+Button(WorldPage,"Add Current Location",function()
+    if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        local pos = LP.Character.HumanoidRootPart.Position
+        local name = "Waypoint " .. (#table.keys(Settings.Waypoints) + 1)
+        Settings.Waypoints[name] = {pos.X, pos.Y, pos.Z}
+        RefreshWaypoints()
+    end
+end)
+Button(WorldPage,"Clear All Waypoints",function() Settings.Waypoints = {} RefreshWaypoints() end)
+
+Section(WorldPage,"Auto Collect")
+Toggle(WorldPage,"Auto Collect Items (Universal)",false,function(v) Settings.AutoCollect = v end)
+Slider(WorldPage,"Collect Range",10,200,50,function(v) Settings.CollectRange = v end)
+
+Section(WorldPage,"Teleport Menu (Waypoints)")
+local WaypointList = Create("Frame",{Parent=WorldPage,Size=UDim2.new(1,0,0,150),BackgroundTransparency=1})
+Create("UIListLayout",{Parent=WaypointList,Padding=UDim.new(0,5)})
+
+local function RefreshWaypoints()
+    for _,v in pairs(WaypointList:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
+    local count = 0
+    for name,cf in pairs(Settings.Waypoints) do
+        count = count + 1
+        local r = Create("Frame",{Parent=WaypointList,Size=UDim2.new(1,-5,0,30),BackgroundColor3=Theme.Card})
+        Create("UICorner",{Parent=r,CornerRadius=UDim.new(0,6)})
+        Create("TextLabel",{Parent=r,Size=UDim2.new(0.6,0,1,0),Position=UDim2.new(0,5,0,0),BackgroundTransparency=1,Text=name,TextColor3=Theme.Text,TextSize=11,Font=Enum.Font.Gotham,TextXAlignment=Enum.TextXAlignment.Left})
+        local b = Create("TextButton",{Parent=r,Size=UDim2.new(0.35,0,0.8,0),Position=UDim2.new(0.6,0,0.1,0),BackgroundColor3=Theme.Bg,Text="TP",TextColor3=Theme.Accent,TextSize=10,Font=Enum.Font.GothamBold})
+        Create("UICorner",{Parent=b,CornerRadius=UDim.new(0,4)})
+        b.MouseButton1Click:Connect(function() if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then LP.Character.HumanoidRootPart.CFrame = CFrame.new(unpack(cf)) end end)
+    end
+    WaypointList.Size = UDim2.new(1,0,0,count * 35)
+end
+
+Button(WorldPage,"Add Current Location",function()
+    if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        local pos = LP.Character.HumanoidRootPart.Position
+        local count = 0 for _,_ in pairs(Settings.Waypoints) do count = count + 1 end
+        local name = "Waypoint " .. (count + 1)
+        Settings.Waypoints[name] = {pos.X, pos.Y, pos.Z}
+        RefreshWaypoints()
+    end
+end)
+Button(WorldPage,"Clear All Waypoints",function() Settings.Waypoints = {} RefreshWaypoints() end)
+
+Section(WorldPage,"Auto Collect")
+Toggle(WorldPage,"Auto Collect Items (Universal)",false,function(v) Settings.AutoCollect = v end)
+Slider(WorldPage,"Collect Range",10,200,50,function(v) Settings.CollectRange = v end)
 
 Section(ToolsPage,"Config")
 Button(ToolsPage,"Save Config",SaveConfig)
