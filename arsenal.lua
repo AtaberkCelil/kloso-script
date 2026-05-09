@@ -193,13 +193,32 @@ if hookmetamethod and getnamecallmethod and checkcaller then
 end
 
 -- TriggerBot & Auto Kill logic
+local function GetAnyTarget()
+	for _, p in Players:GetPlayers() do
+		if p ~= LP and p.Character then
+			local char = p.Character
+			local targetPart = char:FindFirstChild(Settings.Combat.TargetPart) or char:FindFirstChild("Head")
+			if not targetPart then continue end
+			local hum = char:FindFirstChild("Humanoid")
+			if hum and hum.Health <= 0 then continue end
+			if Settings.Combat.TeamCheck and IsTeammate(p) then continue end
+			return p
+		end
+	end
+	return nil
+end
+
 local lastTrigger = 0
 RS.RenderStepped:Connect(function()
     if Settings.Combat.AutoKill then
-        local target = GetClosestPlayer()
-        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
-            -- Teleport behind
-            LP.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+        local target = GetAnyTarget()
+        if target and target.Character and target.Character:FindFirstChild(Settings.Combat.TargetPart) and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+            local targetPart = target.Character[Settings.Combat.TargetPart]
+            -- Teleport behind and above
+            LP.Character.HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
+            LP.Character.HumanoidRootPart.CFrame = targetPart.CFrame * CFrame.new(0, 2, 4)
+            -- Make camera face them so mouse1click shoots at them
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPart.Position)
             -- Shoot
             if tick() - lastTrigger > 0.05 then
                 if mouse1click then mouse1click() end
